@@ -159,7 +159,7 @@ def menuFillFields(fs_dict, db_fields):
 
 if __name__ == '__main__':
     # parse commandline and get appropriate passwords
-    #    accepted format is python zDeskQuery.py -f <config fiiename> -pusername:password
+    #    accepted format is python plutoraGuiPy.py -f <config fiiename>...
     #
     parser = argparse.ArgumentParser(description='Get user/password and configuration-information')
     parser.add_argument('-i', action='store', dest='config_filename', help='initial Config filename ')
