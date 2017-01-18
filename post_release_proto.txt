@@ -1,0 +1,20 @@
+{ 
+  "postRelease": 
+  {
+    "additionalInformation": "#INFO-LIST#",
+    "identifier": "#STRING#",
+    "name": "#STRING#",
+    "summary": "#STRING#",
+    "releaseTypeId": "#ID#",
+    "location": "#STRING#",
+    "releaseStatusTypeId": "#ID#",
+    "releaseRiskLevelId": "#ID#",
+    "implementationDate": "2017-01-09T03:17:38.9137257+00:00",
+    "displayColor": "#STRING#",
+    "organizationId": "#ID#",
+    "managerId": "#ID#",
+    "parentReleaseId": "#ID#",
+    "plutoraReleaseType": "#T-RELEASE#",
+    "releaseProjectType": "#T-PROJECTTYPE#"
+    }
+}
