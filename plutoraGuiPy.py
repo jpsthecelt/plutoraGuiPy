@@ -19,10 +19,6 @@ def createReleaseJson(json_object, json_object2):
     print("(<createReleaseJson> - Not yet implemented)")
     pass
 
-def consoleFillFields(fs_dict, db_fields):
-    print("(<consoleFillFields> - Not yet implemented)")
-    return 0
-
 #
 # This is a sample program to demonstrate programmatically grabbing JSON
 # objects from a file and POSTing them into Plutora
@@ -77,7 +73,7 @@ def plutoraPush(clientid, clientsecret, plutora_username, plutora_password, obje
         r = requests.get(plutoraBaseUrl+getReleases, data=payload, headers=headers)
         if r.status_code != 200:
             print('Get release status code: %i' % r.status_code)
-            print('\nplutoraPush.py: too bad sucka! - [failed on Plutora get]')
+            print('\nplutoraPush.py: too bad! - [failed on Plutora get]')
             exit('Sorry, unrecoverable error; gotta go...')
         else:
             releases = r.json
@@ -90,7 +86,7 @@ def plutoraPush(clientid, clientsecret, plutora_username, plutora_password, obje
         r = requests.post(plutoraBaseUrl+pushRelease, data=payload, headers=headers)
         if r.status_code != 201:
             print('Post new workitem status code: %i' % r.status_code)
-            print('\nplutoraPush.py: too bad sucka! - [failed on Plutora create system POST]')
+            print('\nplutoraPush.py: too bad! - [failed on Plutora create POST]')
             print("header: ", headers)
             pp.pprint(r.json())
             exit('Sorry, unrecoverable error; gotta go...')
@@ -99,6 +95,28 @@ def plutoraPush(clientid, clientsecret, plutora_username, plutora_password, obje
     except:
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
         exit('Error during API processing [POST]')
+
+def consoleFillFields(fs_dict, db_fields):
+    i = 0
+    table_entries = []
+    for k in fs_dict:
+        v = fs_dict[k]
+        l = v+': '
+        orig = ""
+        if db_fields[k] == None:
+            e = '> ('+l+v+')'
+            # Keep table of keys/labels/entry-fields/original-values/updated-values
+            # (in this case, we're simply printing messages on the console and gathering
+            # input)
+        else:
+            e = v
+            orig = db_fields[k]
+
+        n = raw_input(e)
+        table_entries.append([k, l, e, orig, n])
+        i += 1
+
+    return table_entries
 
 def menuFillFields(fs_dict, db_fields):
     root = Tk()
@@ -179,21 +197,23 @@ if __name__ == '__main__':
         plutora_username = data["credentials"]["plutoraUser"].replace('@', '%40')
         plutora_password = data["credentials"]["plutoraPassword"]
 
-        original_fields = data
+# in terms of getting POST prototype, can we grab it from: https://usapi.plutora.com/Help/Api/POST-releases
+# body/div/2nd section/P/H2/H3/Pa/H3/P/A/TABLE/H3/Div/H2/H3/P/A/TABLE/H3/Div/Div/span/pre/#text
         with open(post_target_values) as json_data_file:
             data = json.load(json_data_file, object_pairs_hook=OrderedDict)
         json_object = data
+        original_fields = data
 
         if results.gui == True:
-            sxs = menuFillFields(fields, original_fields)
+            new_object = menuFillFields(fields, original_fields)
         else:
-            sxs = consoleFillFields(fields, original_fields)
+            new_object = consoleFillFields(fields, original_fields)
 
     except:
          # ex.msg is a string that looks like a dictionary
          print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
          exit('couldnt open file {0}'.format(post_target_values))
  
-    createReleaseJson(json_object, original_fields)
+    createReleaseJson(new_object, original_fields)
     plutoraPush(client_id, client_secret, plutora_username, plutora_password, json_object)
 
