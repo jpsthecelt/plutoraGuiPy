@@ -63,19 +63,19 @@ def updatePlutoraDB(creds, updated_json):
 #        getSystems = '/systems'
 #        getOrganizationsTree = '/organizations/tree'
 
-        # Get specified Plutora Release info
-        r = requests.get(plutoraBaseUrl+getReleases, data=payload, headers=headers)
-        if r.status_code != 200:
-            print('Get release status code: %i' % r.status_code)
-            print('\nupdatePlutoraDB.py: too bad! - [failed on Plutora get]')
-            exit('Sorry, unrecoverable error; gotta go...')
-        else:
-            releases = r.json
-            pp.pprint(r.json())
+#        # Get specified Plutora Release info
+#        r = requests.get(plutoraBaseUrl+getReleases, data=payload, headers=headers)
+#        if r.status_code != 200:
+#            print('Get release status code: %i' % r.status_code)
+#            print('\nupdatePlutoraDB.py: too bad! - [failed on Plutora get]')
+#            exit('Sorry, unrecoverable error; gotta go...')
+#        else:
+#            releases = r.json
+#            pp.pprint(r.json())
 
     try:
         headers["content-type"] = "application/json"
-        payload = dict2json(updated_json)
+        payload = json.dumps(updated_json)
 #        payload = """{ "additionalInformation": [], "name": "API created System 12", "vendor": "API created vendor", "status": "Active", "organizationId": "%s", "description": "Description of API created System 12" }""" % r.json()['childs'][0]['id']
 
         r = requests.post(plutoraBaseUrl+pushRelease, data=payload, headers=headers)
@@ -211,6 +211,8 @@ if __name__ == '__main__':
 # body/div/2nd section/P/H2/H3/Pa/H3/P/A/TABLE/H3/Div/H2/H3/P/A/TABLE/H3/Div/Div/span/pre/#text
 # OR, if doc is set to x.text, maybe something like:
 # d = json.loads(doc["html"]["body"]["div"]["section"][1]["div"]["div"][1]['div'][0]['pre']['#text'],object_pairs_hook=OrderedDict)
+
+# Of course, an alternative would be to simply use the fields 'garnered' from the previous read.
         with open(post_target_values) as json_data_file:
             fields = json.load(json_data_file, object_pairs_hook=OrderedDict)
 
