@@ -8,15 +8,63 @@ from Tkinter import *
 import ttk
 from collections import OrderedDict
 
+
 #
 # This is a sample program to demonstrate programmatically grabbing JSON
-# objects from a file and POSTing them into Plutora
+# objects from a file, verifying values, and POSTing them into Plutora
 #
+
+# return value from name-hash
+def names(name):
+    return name['value']
+
+def isGuid(value):
+    return all (c in set(string.hexdigits+'-') for c in value)
+
+def guidFromValue(verb, parmDesc, value, header, payload):
+    res = requests(verb, plutoraBaseUrl+'/lookupfields/'+parmDesc, payload=payload, headers=header)
+    if res.status_code != 200:
+        return res.json()
+    else:
+        lookup_ids = res.json()
+    lookup_id = [id_val for id_val in lookup_ids if id_val[value] == target_val]
+    if len(lookup_id) == 0:
+        return 'must be one of %s' % (','.join(map(names,target_val)))
+    else:
+        return lookup_id[0]['id']
+
+def verifyReleaseGuidFields(fields, updated_field_values ):
+
+    value = updated_field_values['ReleaseTypeId']
+    if value == None:
+        return False
+    if not isGuid(value) and not (guid = guidFromValue(GET, 'ReleaseTypeId', value, header, payload)):
+        return  False
+
+    return True
+
+# given a value & a field-name lookup and validate whether value is valid; returning
+# the appropriate ID.
+# ******* TODO: MUST refactor, based on new getGuidFromValue() function ********
+def lookupFieldByIdNvalidate(value, field, target_val, header):
+    res = requests.get(plutoraBaseUrl+'/lookupfields'+field, headers=header)
+    if res.status_code != 200:
+        return res.json()
+    else:
+        lookup_ids = res.json()
+    lookup_id = [id_val for id_val in lookup_ids if id_val[value] == target_val]
+    if len(lookup_id) == 0:
+        return 'must be one of %s' % (','.join(map(names,target_val)))
+    else:
+        return lookup_id[0]['id']
+
+# Given the original values (and any we supplied in the GUI, verify & go update
+# the DB
 def updatePlutoraDB(creds, updated_json):
-    clientid = creds['clientid']
-    clientsecret = creds['clientsecret']
-    plutora_username = creds['plutora_username']
-    plutora_password = creds['plutora_passwords']
+    clientid = creds['client_id']
+    clientsecret = creds['client_secret']
+    plutora_username = creds['username']
+    plutora_password = creds['password']
 
     # Set up JSON pretty-printing
     pp = pprint.PrettyPrinter(indent=4)
@@ -24,16 +72,11 @@ def updatePlutoraDB(creds, updated_json):
     # Setup for Plutora Get authorization-token (using the 
     # passed parameters, which were obtained from the file 
     # referenced on the command-line
-    authTokenUrl = "https://usoauth.plutora.com/oauth/token"
-    plutoraBaseUrl = 'https://usapi.plutora.com'
+    authTokenUrl = plutoraBaseUrl+"/oauth/token"
     payload = 'client_id=' + clientid + '&client_secret=' + clientsecret + '&' + 'grant_type=password&username='
     payload = payload + plutora_username + '&password=' + plutora_password + '&='
     
-    headers = {
-        'content-type': "application/x-www-form-urlencoded",
-        'cache-control': "no-cache",
-        'postman-token': "bc355474-15d1-1f56-6e35-371b930eac6f"
-        }
+    headers = { 'content-type': 'application/x-www-form-urlencoded', }
     
     # Connect to get Plutora access token for subsequent queries
     authResponse = requests.post(authTokenUrl, data=payload, headers=headers)
@@ -43,31 +86,24 @@ def updatePlutoraDB(creds, updated_json):
         exit('Sorry, unrecoverable error; gotta go...')
     else:
         accessToken = authResponse.json()["access_token"]
-    
-    # Connect to get Plutora access token for subsequent queries
-    authResponse = requests.post(authTokenUrl, data=payload, headers=headers)
-    if authResponse.status_code != 200:
-        print(authResponse.status_code)
-        print('updatePlutoraDB.py: Sorry! - [failed on getAuthToken]: ', authResponse.text)
-        exit('Sorry, unrecoverable error; gotta go...')
-    else:
-        accessToken = authResponse.json()["access_token"]
-    
-        # Experiment -- Get Plutora information for all system releases, or systems, or just the organization-tree
-        getReleases = pushRelease = '/releases'
 
-#        getParticularRelease = '/releases/9d18a2dc-b694-4b20-971f-4944420f4038'
+        getReleases = pushRelease = '/releases'
+        releaseGuid = '9d18a2dc-b694-4b20-971f-4944420f4038'
+
+        getParticularRelease = getReleases + '/' + releaseGuid
+
 #        getSystems = '/systems'
 #        getOrganizationsTree = '/organizations/tree'
 #        getHosts = '/hosts'
 #        getSystems = '/systems'
 #        getOrganizationsTree = '/organizations/tree'
 
-#        # Get specified Plutora Release info
-#        r = requests.get(plutoraBaseUrl+getReleases, data=payload, headers=headers)
+        # Get specified Plutora Release info
+#        r = requests.get(plutoraBaseUrl+getParticularRelease, data=payload, headers=headers)
 #        if r.status_code != 200:
 #            print('Get release status code: %i' % r.status_code)
 #            print('\nupdatePlutoraDB.py: too bad! - [failed on Plutora get]')
+#            pp.pprint(r.json())
 #            exit('Sorry, unrecoverable error; gotta go...')
 #        else:
 #            releases = r.json
@@ -75,12 +111,20 @@ def updatePlutoraDB(creds, updated_json):
 
     try:
         headers["content-type"] = "application/json"
+        authHeader = { 'Authorization': 'bearer %s' % (accessToken,) }
+#        res = requests.get(plutoraBaseUrl+'/me', headers=authHeader)
+        updated_json['name'] = 'Copy of ' + updated_json['name']
+        if updated_json['additionalInformation'] == None or updated_json['additionalInformation'] == '[]':
+            updated_json['additionalInformation'] = []
+
+# ****** gotta figure out how to validate this sh*t!!!
+        lookupNvalidateIdByField(value, field, target_val, header):
         payload = json.dumps(updated_json)
 #        payload = """{ "additionalInformation": [], "name": "API created System 12", "vendor": "API created vendor", "status": "Active", "organizationId": "%s", "description": "Description of API created System 12" }""" % r.json()['childs'][0]['id']
 
-        r = requests.post(plutoraBaseUrl+pushRelease, data=payload, headers=headers)
+        r = requests.post(plutoraBaseUrl+pushRelease, data=payload, headers=authHeader)
         if r.status_code != 201:
-            print('Post new workitem status code: %i' % r.status_code)
+            print('Post new release status code: %i' % r.status_code)
             print('\nupdatePlutoraDB.py: too bad! - [failed on Plutora create POST]')
             print("header: ", headers)
             pp.pprint(r.json())
@@ -162,6 +206,8 @@ class CreateMenu:
 
 
 if __name__ == '__main__':
+    plutoraBaseUrl = 'https://usapi.plutora.com'
+    postValue = getGuidFromValue
     # parse commandline and get appropriate passwords
     #    accepted format is python plutoraGuiPy.py -f <config fiiename>...
     #
@@ -178,7 +224,7 @@ if __name__ == '__main__':
         parser.usage
         parser.exit()
 
-# Lifielde to be able to 'grab it' from the website, a la wget from
+# I'd like to be able to 'grab it' from the website, a la wget,
 # do an xmltodict, select xml2json(doc["html"]["body"]["div"]["section"][1]["div"]["div"])
 # and then a xml2python to get field-names/types
     field_names_file = results.field_names_file
@@ -195,10 +241,10 @@ if __name__ == '__main__':
         with open(config_filename) as data_file:
             data = json.load(data_file)
         credentials = {
-            'client_id': data["credentials"]["clientId"],
-            'client_secret': data["credentials"]["clientSecret"],
-            'plutora_username': data["credentials"]["plutoraUser"].replace('@', '%40'),
-            'plutora_password': data["credentials"]["plutoraPassword"]
+            'client_id': data["credentials"]["client_id"],
+            'client_secret': data["credentials"]["client_secret"],
+            'username': data["credentials"]["username"].replace('@', '%40'),
+            'password': data["credentials"]["password"]
         }
 
         # Open field-names file
@@ -219,14 +265,18 @@ if __name__ == '__main__':
         if results.gui:
             updated_field_values = CreateMenu(fields).fetch()
         else:
-            new_field_values = consoleFillFields(fields)
+            updated_field_values = consoleFillFields(fields)
+
+        if not verifyReleaseGuidFields(fields, updated_field_values ):
+            pp.pprint(updated_field_values)
+            exit('Missing Release Fields (must have all of Location, Organization, ReleaseRiskLevelId, ReleaseStatusTypeId, ManagerId, ReleaseTypeId)')
+
+        updatePlutoraDB(credentials, updated_field_values)
 
     except:
          # ex.msg is a string that looks like a dictionary
          print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0], sys.exc_info()[1].message)
-         exit('couldnt open file {0}'.format(post_target_values))
+#         exit('couldnt open file {0}'.format(post_target_values))
 
 
-#    updated_field_values = menu_obj.fetch()
-    updatePlutoraDB(credentials, updated_field_values)
 

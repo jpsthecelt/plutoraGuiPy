@@ -1,6 +1,6 @@
 This is an example of a Tkinter GUI-based on programmatically reading an existing record, 
-displaing it, allowing update (through the GUI) and 'pushing' some JSON 
-object into Plutora.  
+displaing it, allowing update (through the GUI) and 'pushing' that JSON 
+object back into Plutora.  
 
 Programmed in Python, and using requests, this takes commandline parameters of form 
     '-i', 'config_filename' - 'initial Config filename '
@@ -9,7 +9,7 @@ Programmed in Python, and using requests, this takes commandline parameters of f
     '-f', action='store' dest='field_names_file' - 'name of file containing field-names'
     "--gui", default=True - 'store_true'
     
-The credentials from the credentials file are used to log into Plutora.
+The credentials from the credentials-init-file are used to log into Plutora.
 
-	1.20.17-jps
+	1.24.17-jps
 
