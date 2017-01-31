@@ -1,11 +1,11 @@
-import sys
-
 import requests
 import argparse
 import pprint
 import json
 from Tkinter import *
 import ttk
+import sys
+import string
 from collections import OrderedDict
 
 
@@ -13,54 +13,82 @@ from collections import OrderedDict
 # This is a sample program to demonstrate programmatically grabbing JSON
 # objects from a file, verifying values, and POSTing them into Plutora
 #
+plutoraBaseUrl = 'https://usapi.plutora.com'
+
 
 # return value from name-hash
 def names(name):
     return name['value']
 
+# Decide if the current argument is a guid or some other field
 def isGuid(value):
     return all (c in set(string.hexdigits+'-') for c in value)
 
-def guidFromValue(verb, parmDesc, value, header, payload):
-    res = requests(verb, plutoraBaseUrl+'/lookupfields/'+parmDesc, payload=payload, headers=header)
+# Given a 'sub-Url', do a get and determine if the element is a match to the supplied value.
+# if not, emit error-message, else emit proper Guid
+def guidFromValue(parmDesc, elem, value, header ):
+    res = requests.get(plutoraBaseUrl+parmDesc, headers=header)
+
     if res.status_code != 200:
         return res.json()
     else:
         lookup_ids = res.json()
-    lookup_id = [id_val for id_val in lookup_ids if id_val[value] == target_val]
+    lookup_id = [id_val for id_val in lookup_ids if id_val[elem] == value]
+
     if len(lookup_id) == 0:
-        return 'must be one of %s' % (','.join(map(names,target_val)))
+        return 'must be one of %s' % (','.join(map(names,value)))
     else:
         return lookup_id[0]['id']
 
-def verifyReleaseGuidFields(fields, updated_field_values ):
+# verify that all mandatory release-fields have the appropriate values
+# and return JSON-string with appropriately updated data, including
+# substitutions of Guids for text values (in all Guid-fields).
+def verifyReleaseGuidFields(updated_field_values, hdr ):
 
-    value = updated_field_values['ReleaseTypeId']
+    # 'sanity-check' name/id/addn'l info & required fields
+    if updated_field_values['additionalInformation'] == None or updated_field_values['additionalInformation'] == '[]':
+        updated_field_values['additionalInformation'] = []
+
+    value = updated_field_values['releaseTypeId']
     if value == None:
-        return False
-    if not isGuid(value) and not (guid = guidFromValue(GET, 'ReleaseTypeId', value, header, payload)):
-        return  False
+        return '{ReleaseTypeId is required}'
+    if not isGuid(value):
+        guid = guidFromValue('/lookupfields/ReleaseType', 'value', value, hdr )
+        if not isGuid(guid): return '{ReleaseTypeId is required}'
+        else: updated_field_values['releaseTypeId'] = guid
 
-    return True
+    if updated_field_values['location'] == None:
+        return '{Location is required}'
 
-# given a value & a field-name lookup and validate whether value is valid; returning
-# the appropriate ID.
-# ******* TODO: MUST refactor, based on new getGuidFromValue() function ********
-def lookupFieldByIdNvalidate(value, field, target_val, header):
-    res = requests.get(plutoraBaseUrl+'/lookupfields'+field, headers=header)
-    if res.status_code != 200:
-        return res.json()
-    else:
-        lookup_ids = res.json()
-    lookup_id = [id_val for id_val in lookup_ids if id_val[value] == target_val]
-    if len(lookup_id) == 0:
-        return 'must be one of %s' % (','.join(map(names,target_val)))
-    else:
-        return lookup_id[0]['id']
+    value = updated_field_values['releaseStatusTypeId']
+    if not isGuid(value):
+        guid = guidFromValue('/lookupfields/ReleaseStatusType', 'value', value, hdr)
+        if not isGuid(guid): return  '{ReleaseStatusTypeId is required}'
+        else: updated_field_values['releaseStatusTypeId'] = guid
 
-# Given the original values (and any we supplied in the GUI, verify & go update
-# the DB
-def updatePlutoraDB(creds, updated_json):
+    value = updated_field_values['releaseRiskLevelId']
+    if not isGuid(value):
+        guid = guidFromValue('/lookupfields/ReleaseRiskLevel', 'value', value, hdr)
+        if not isGuid(guid): return  '{ReleaseRiskLevelId is required}'
+        else: updated_field_values['releaseRiskLevelId'] = guid
+
+    value = updated_field_values['organizationId']
+    if not isGuid(value):
+        guid = guidFromValue('/organizations', 'name', value, hdr)
+        if not isGuid(guid): return '{organizationId is required}'
+        else: updated_field_values['organizationId'] = guid
+
+    value = updated_field_values['managerId']
+    if not isGuid(value):
+        guid = guidFromValue('/users', 'userName', value, hdr)
+        if not isGuid(guid): return  '{managerID is required}'
+        else: updated_field_values['managerId'] = guid
+
+    return json.dumps(updated_field_values)
+
+# Given the original values (and any we supplied in the GUI, verify consistency
+# & go update the DB
+def updatePlutoraDB(creds, starting_fields, updated_json):
     clientid = creds['client_id']
     clientsecret = creds['client_secret']
     plutora_username = creds['username']
@@ -72,7 +100,7 @@ def updatePlutoraDB(creds, updated_json):
     # Setup for Plutora Get authorization-token (using the 
     # passed parameters, which were obtained from the file 
     # referenced on the command-line
-    authTokenUrl = plutoraBaseUrl+"/oauth/token"
+    authTokenUrl = "https://usoauth.plutora.com/oauth/token"
     payload = 'client_id=' + clientid + '&client_secret=' + clientsecret + '&' + 'grant_type=password&username='
     payload = payload + plutora_username + '&password=' + plutora_password + '&='
     
@@ -87,41 +115,23 @@ def updatePlutoraDB(creds, updated_json):
     else:
         accessToken = authResponse.json()["access_token"]
 
+    try:
         getReleases = pushRelease = '/releases'
         releaseGuid = '9d18a2dc-b694-4b20-971f-4944420f4038'
-
         getParticularRelease = getReleases + '/' + releaseGuid
 
-#        getSystems = '/systems'
-#        getOrganizationsTree = '/organizations/tree'
-#        getHosts = '/hosts'
-#        getSystems = '/systems'
-#        getOrganizationsTree = '/organizations/tree'
-
-        # Get specified Plutora Release info
-#        r = requests.get(plutoraBaseUrl+getParticularRelease, data=payload, headers=headers)
-#        if r.status_code != 200:
-#            print('Get release status code: %i' % r.status_code)
-#            print('\nupdatePlutoraDB.py: too bad! - [failed on Plutora get]')
-#            pp.pprint(r.json())
-#            exit('Sorry, unrecoverable error; gotta go...')
-#        else:
-#            releases = r.json
-#            pp.pprint(r.json())
-
-    try:
         headers["content-type"] = "application/json"
         authHeader = { 'Authorization': 'bearer %s' % (accessToken,) }
-#        res = requests.get(plutoraBaseUrl+'/me', headers=authHeader)
-        updated_json['name'] = 'Copy of ' + updated_json['name']
-        if updated_json['additionalInformation'] == None or updated_json['additionalInformation'] == '[]':
-            updated_json['additionalInformation'] = []
 
-# ****** gotta figure out how to validate this sh*t!!!
-        lookupNvalidateIdByField(value, field, target_val, header):
-        payload = json.dumps(updated_json)
-#        payload = """{ "additionalInformation": [], "name": "API created System 12", "vendor": "API created vendor", "status": "Active", "organizationId": "%s", "description": "Description of API created System 12" }""" % r.json()['childs'][0]['id']
+        if starting_fields['name'] == updated_json['name']:
+            updated_json['name'] = 'Copy of ' + updated_json['name']
 
+        payload = verifyReleaseGuidFields(updated_json, authHeader)
+        if ''.join(map(str, updated_json)).find('required') != -1:
+            pp.pprint(updated_json)
+            exit('POST requires certain fields')
+
+        authHeader["content-type"] = "application/json"
         r = requests.post(plutoraBaseUrl+pushRelease, data=payload, headers=authHeader)
         if r.status_code != 201:
             print('Post new release status code: %i' % r.status_code)
@@ -135,6 +145,7 @@ def updatePlutoraDB(creds, updated_json):
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
         exit('Error during API processing [POST]')
 
+# Vestigal; could cause crash if --noguid is supplied on the command-line
 def consoleFillFields(db_fields):
     i = 0
     table_entries = []
@@ -157,6 +168,7 @@ def consoleFillFields(db_fields):
 
     return table_entries
 
+# given a list of dictionary elements, create a menu which allows updating.
 class CreateMenu:
     def fetch(self):
         new_values = OrderedDict()
@@ -194,6 +206,7 @@ class CreateMenu:
             ent.pack(side=RIGHT, expand=YES, fill=X)
             entries[field] = ent
 
+# (might be used, later, to validate fields on-the-fly)
 #        submit_btn = Button(upper_frame, text="Update Plutora", command=(lambda event, e=entries: self.fetch(e)))
 #        submit_btn.pack(side=RIGHT)
 
@@ -206,8 +219,6 @@ class CreateMenu:
 
 
 if __name__ == '__main__':
-    plutoraBaseUrl = 'https://usapi.plutora.com'
-    postValue = getGuidFromValue
     # parse commandline and get appropriate passwords
     #    accepted format is python plutoraGuiPy.py -f <config fiiename>...
     #
@@ -224,7 +235,8 @@ if __name__ == '__main__':
         parser.usage
         parser.exit()
 
-# I'd like to be able to 'grab it' from the website, a la wget,
+# (potentially used for later)
+# I'd like to be able to 'grab' prototype from the website, a la wget,
 # do an xmltodict, select xml2json(doc["html"]["body"]["div"]["section"][1]["div"]["div"])
 # and then a xml2python to get field-names/types
     field_names_file = results.field_names_file
@@ -267,11 +279,7 @@ if __name__ == '__main__':
         else:
             updated_field_values = consoleFillFields(fields)
 
-        if not verifyReleaseGuidFields(fields, updated_field_values ):
-            pp.pprint(updated_field_values)
-            exit('Missing Release Fields (must have all of Location, Organization, ReleaseRiskLevelId, ReleaseStatusTypeId, ManagerId, ReleaseTypeId)')
-
-        updatePlutoraDB(credentials, updated_field_values)
+        updatePlutoraDB(credentials, original_fields, updated_field_values)
 
     except:
          # ex.msg is a string that looks like a dictionary
