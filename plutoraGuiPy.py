@@ -12,6 +12,8 @@ from collections import OrderedDict
 #
 # This is a sample program to demonstrate programmatically grabbing JSON
 # objects from a file, verifying values, and POSTing them into Plutora
+# (note that -f and -c are mutually-exclusive; the first one on the command-line
+# takes precedence).
 #
 plutoraBaseUrl = 'https://usapi.plutora.com'
 
@@ -31,8 +33,11 @@ def guidFromValue(parmDesc, elem, value, header ):
 
     if res.status_code != 200:
         return res.json()
+    elif elem == 'raw_get':
+        return res.text
     else:
         lookup_ids = res.json()
+
     lookup_id = [id_val for id_val in lookup_ids if id_val[elem] == value]
 
     if len(lookup_id) == 0:
@@ -86,9 +91,7 @@ def verifyReleaseGuidFields(updated_field_values, hdr ):
 
     return json.dumps(updated_field_values)
 
-# Given the original values (and any we supplied in the GUI, verify consistency
-# & go update the DB
-def updatePlutoraDB(creds, starting_fields, updated_json):
+def getAuth(creds):
     clientid = creds['client_id']
     clientsecret = creds['client_secret']
     plutora_username = creds['username']
@@ -97,15 +100,15 @@ def updatePlutoraDB(creds, starting_fields, updated_json):
     # Set up JSON pretty-printing
     pp = pprint.PrettyPrinter(indent=4)
 
-    # Setup for Plutora Get authorization-token (using the 
-    # passed parameters, which were obtained from the file 
+    # Setup for Plutora Get authorization-token (using the
+    # passed parameters, which were obtained from the file
     # referenced on the command-line
     authTokenUrl = "https://usoauth.plutora.com/oauth/token"
     payload = 'client_id=' + clientid + '&client_secret=' + clientsecret + '&' + 'grant_type=password&username='
     payload = payload + plutora_username + '&password=' + plutora_password + '&='
-    
+
     headers = { 'content-type': 'application/x-www-form-urlencoded', }
-    
+
     # Connect to get Plutora access token for subsequent queries
     authResponse = requests.post(authTokenUrl, data=payload, headers=headers)
     if authResponse.status_code != 200:
@@ -115,13 +118,21 @@ def updatePlutoraDB(creds, starting_fields, updated_json):
     else:
         accessToken = authResponse.json()["access_token"]
 
-    try:
-        getReleases = pushRelease = '/releases'
-        releaseGuid = '9d18a2dc-b694-4b20-971f-4944420f4038'
-        getParticularRelease = getReleases + '/' + releaseGuid
+    getReleases = pushRelease = '/releases'
+    releaseGuid = '9d18a2dc-b694-4b20-971f-4944420f4038'
+    getParticularRelease = getReleases + '/' + releaseGuid
 
-        headers["content-type"] = "application/json"
-        authHeader = { 'Authorization': 'bearer %s' % (accessToken,) }
+    authHeader = { 'Authorization': 'bearer %s' % (accessToken,) }
+    authHeader["content-type"] = "application/json"
+    return authHeader
+
+# Given the original values (and any we supplied in the GUI, verify consistency
+# & go update the DB
+def updatePlutoraDB(credentials, starting_fields, updated_json):
+    pp = pprint.PrettyPrinter(indent=4)
+
+    try:
+        authHeader = getAuth(credentials)
 
         if starting_fields['name'] == updated_json['name']:
             updated_json['name'] = 'Copy of ' + updated_json['name']
@@ -131,12 +142,11 @@ def updatePlutoraDB(creds, starting_fields, updated_json):
             pp.pprint(updated_json)
             exit('POST requires certain fields')
 
-        authHeader["content-type"] = "application/json"
-        r = requests.post(plutoraBaseUrl+pushRelease, data=payload, headers=authHeader)
+        r = requests.post(plutoraBaseUrl+'/releases', data=payload, headers=authHeader)
         if r.status_code != 201:
             print('Post new release status code: %i' % r.status_code)
             print('\nupdatePlutoraDB.py: too bad! - [failed on Plutora create POST]')
-            print("header: ", headers)
+            print("header: ", authHeader)
             pp.pprint(r.json())
             exit('Sorry, unrecoverable error; gotta go...')
         else:
@@ -226,8 +236,8 @@ if __name__ == '__main__':
     parser.add_argument('-i', action='store', dest='config_filename', help='initial Config filename ')
     parser.add_argument('-p', action='store', dest='post_target_values',
                         help='filename containing JSON object prototype')
-    parser.add_argument('-c', action='store', dest='release_id', help='release-id of release to copy')
-    parser.add_argument('-f', action='store', dest='field_names_file', help='name of file containing field-names')
+    parser.add_argument('-c', action='store', dest='release_id_to_copy', help='release-id of release to copy')
+    parser.add_argument('-f', action='store', dest='source_file', help='name of file containing field-names')
     parser.add_argument("--gui", default=True, action='store_true')
     results = parser.parse_args()
 
@@ -239,9 +249,14 @@ if __name__ == '__main__':
 # I'd like to be able to 'grab' prototype from the website, a la wget,
 # do an xmltodict, select xml2json(doc["html"]["body"]["div"]["section"][1]["div"]["div"])
 # and then a xml2python to get field-names/types
-    field_names_file = results.field_names_file
-    if results.field_names_file == None:
-        field_names_file = 'field_names.txt'
+
+    # as it turns out the -f parameter is currently used as the file from which to copy the initial values
+    # (this would mean, of course, that -f & -c should be mutually-exclusive).
+    source_file = results.source_file
+    if results.source_file == None:
+        source_file = 'field_names.txt'
+    elif results.release_id_to_copy != None:
+        release_id_to_copy = results.release_id_to_copy
 
     config_filename = results.config_filename
     if results.config_filename == None:
@@ -260,7 +275,7 @@ if __name__ == '__main__':
         }
 
         # Open field-names file
-        with open(field_names_file) as fnames:
+        with open(source_file) as fnames:
             fields = json.load(fnames, object_pairs_hook=OrderedDict)
         original_fields = fields
         post_target_values = results.post_target_values
@@ -270,20 +285,27 @@ if __name__ == '__main__':
 # OR, if doc is set to x.text, maybe something like:
 # d = json.loads(doc["html"]["body"]["div"]["section"][1]["div"]["div"][1]['div'][0]['pre']['#text'],object_pairs_hook=OrderedDict)
 
-# Of course, an alternative would be to simply use the fields 'garnered' from the previous read.
-        with open(post_target_values) as json_data_file:
-            fields = json.load(json_data_file, object_pairs_hook=OrderedDict)
-
-        if results.gui:
-            updated_field_values = CreateMenu(fields).fetch()
+        # We're currently simply using the fields 'garnered' from the JSON parameter file-read.
+        if (not post_target_values and results.release_id_to_copy != None):
+            authHeader = getAuth(credentials)
+            release_copy = guidFromValue('/releases/'+results.release_id_to_copy, 'raw_get', 0, authHeader )
+#            fields = json.load(guidFromValue('/releases/'+results.release_id_to_copy, 'raw_get', 0, authHeader ), object_pairs_hook=OrderedDict)
+            original_fields = json.loads(release_copy, object_pairs_hook=OrderedDict)
+            updated_field_values = CreateMenu(original_fields).fetch()
         else:
-            updated_field_values = consoleFillFields(fields)
+            with open(post_target_values) as json_data_file:
+                fields = json.load(json_data_file, object_pairs_hook=OrderedDict)
+            if results.gui:
+                updated_field_values = CreateMenu(fields).fetch()
+            else:
+                updated_field_values = consoleFillFields(fields)
 
         updatePlutoraDB(credentials, original_fields, updated_field_values)
 
-    except:
+    except Exception as e:
          # ex.msg is a string that looks like a dictionary
-         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0], sys.exc_info()[1].message)
+         e = sys.exc_info()[0]
+         print "EXCEPTION: %s" % e
 #         exit('couldnt open file {0}'.format(post_target_values))
 
 
