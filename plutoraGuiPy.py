@@ -3,7 +3,7 @@ import argparse
 import pprint
 import json
 from Tkinter import *
-import ttk
+import tkMessageBox
 import sys
 import string
 from collections import OrderedDict
@@ -28,7 +28,7 @@ def isGuid(value):
 
 # Given a 'sub-Url', do a get and determine if the element is a match to the supplied value.
 # if not, emit error-message, else emit proper Guid
-def guidFromValue(parmDesc, elem, value, header ):
+def getOrGetGuidFromValue(parmDesc, elem, value, header ):
     res = requests.get(plutoraBaseUrl+parmDesc, headers=header)
 
     if res.status_code != 200:
@@ -58,7 +58,7 @@ def verifyReleaseGuidFields(updated_field_values, hdr ):
     if value == None:
         return '{ReleaseTypeId is required}'
     if not isGuid(value):
-        guid = guidFromValue('/lookupfields/ReleaseType', 'value', value, hdr )
+        guid = getOrGetGuidFromValue('/lookupfields/ReleaseType', 'value', value, hdr )
         if not isGuid(guid): return '{ReleaseTypeId is required}'
         else: updated_field_values['releaseTypeId'] = guid
 
@@ -67,25 +67,25 @@ def verifyReleaseGuidFields(updated_field_values, hdr ):
 
     value = updated_field_values['releaseStatusTypeId']
     if not isGuid(value):
-        guid = guidFromValue('/lookupfields/ReleaseStatusType', 'value', value, hdr)
+        guid = getOrGetGuidFromValue('/lookupfields/ReleaseStatusType', 'value', value, hdr)
         if not isGuid(guid): return  '{ReleaseStatusTypeId is required}'
         else: updated_field_values['releaseStatusTypeId'] = guid
 
     value = updated_field_values['releaseRiskLevelId']
     if not isGuid(value):
-        guid = guidFromValue('/lookupfields/ReleaseRiskLevel', 'value', value, hdr)
+        guid = getOrGetGuidFromValue('/lookupfields/ReleaseRiskLevel', 'value', value, hdr)
         if not isGuid(guid): return  '{ReleaseRiskLevelId is required}'
         else: updated_field_values['releaseRiskLevelId'] = guid
 
     value = updated_field_values['organizationId']
     if not isGuid(value):
-        guid = guidFromValue('/organizations', 'name', value, hdr)
+        guid = getOrGetGuidFromValue('/organizations', 'name', value, hdr)
         if not isGuid(guid): return '{organizationId is required}'
         else: updated_field_values['organizationId'] = guid
 
     value = updated_field_values['managerId']
     if not isGuid(value):
-        guid = guidFromValue('/users', 'userName', value, hdr)
+        guid = getOrGetGuidFromValue('/users', 'userName', value, hdr)
         if not isGuid(guid): return  '{managerID is required}'
         else: updated_field_values['managerId'] = guid
 
@@ -113,39 +113,68 @@ def getAuth(creds):
     authResponse = requests.post(authTokenUrl, data=payload, headers=headers)
     if authResponse.status_code != 200:
         print(authResponse.status_code)
-        print('updatePlutoraDB.py: Sorry! - [failed on getAuthToken]: ', authResponse.text)
+        print('updateDB: Sorry! - [failed on getAuthToken]: ', authResponse.text)
         exit('Sorry, unrecoverable error; gotta go...')
     else:
         accessToken = authResponse.json()["access_token"]
-
-    getReleases = pushRelease = '/releases'
-    releaseGuid = '9d18a2dc-b694-4b20-971f-4944420f4038'
-    getParticularRelease = getReleases + '/' + releaseGuid
 
     authHeader = { 'Authorization': 'bearer %s' % (accessToken,) }
     authHeader["content-type"] = "application/json"
     return authHeader
 
-# Given the original values (and any we supplied in the GUI, verify consistency
-# & go update the DB
-def updatePlutoraDB(credentials, starting_fields, updated_json):
+def verifySystemGuidFields(updated_field_values, auth_header):
+    # 'sanity-check' name/id/addn'l info & required fields
+    if updated_field_values['additionalInformation'] == None or updated_field_values['additionalInformation'] == '[]':
+        updated_field_values['additionalInformation'] = []
+
+    value = updated_field_values['Name']
+    if value == None:
+        return '{Name is required}'
+    if value.isalpha():
+        updated_field_values['Name'] = value
+    else:
+        return '{Name is required}'
+
+    value = updated_field_values['Vendor']
+    if value == None:
+        return '{Vendor is required}'
+    if value.isalpha():
+        updated_field_values['Vendor'] = value
+    else:
+        return '{Vendor is required}'
+
+    value = updated_field_values['Status']
+    if not isGuid(value):
+        guid = getOrGetGuidFromValue('/lookupfields/SystemStatusType', 'value', value, auth_header)
+        if not isGuid(guid): return  '{SystemStatusTypeId is required}'
+        else: updated_field_values['SystemStatusTypeId'] = guid
+
+    value = updated_field_values['organizationId']
+    if not isGuid(value):
+        guid = getOrGetGuidFromValue('/organizations', 'name', value, auth_header)
+        if not isGuid(guid): return '{organizationId is required}'
+        else: updated_field_values['organizationId'] = guid
+
+    return json.dumps(updated_field_values)
+
+    pass
+
+def updateSystemPlutoraDB(starting_fields, updated_json, auth_header):
     pp = pprint.PrettyPrinter(indent=4)
 
     try:
-        authHeader = getAuth(credentials)
-
         if starting_fields['name'] == updated_json['name']:
             updated_json['name'] = 'Copy of ' + updated_json['name']
 
-        payload = verifyReleaseGuidFields(updated_json, authHeader)
+        payload = verifySystemGuidFields(updated_json, auth_header)
         if ''.join(map(str, updated_json)).find('required') != -1:
             pp.pprint(updated_json)
             exit('POST requires certain fields')
 
-        r = requests.post(plutoraBaseUrl+'/releases', data=payload, headers=authHeader)
+        r = requests.post(plutoraBaseUrl+'/systems', data=payload, headers=auth_header)
         if r.status_code != 201:
             print('Post new release status code: %i' % r.status_code)
-            print('\nupdatePlutoraDB.py: too bad! - [failed on Plutora create POST]')
+            print('\nupdateReleasePlutoraDB.py: too bad! - [failed on Plutora create POST]')
             print("header: ", authHeader)
             pp.pprint(r.json())
             exit('Sorry, unrecoverable error; gotta go...')
@@ -155,7 +184,35 @@ def updatePlutoraDB(credentials, starting_fields, updated_json):
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
         exit('Error during API processing [POST]')
 
-# Vestigal; could cause crash if --noguid is supplied on the command-line
+# Given the original values (and any we supplied in the GUI, verify consistency
+# & go update the DB
+def updateReleasePlutoraDB(starting_fields, updated_json, auth_header):
+    pp = pprint.PrettyPrinter(indent=4)
+
+    try:
+        if starting_fields['name'] == updated_json['name']:
+            updated_json['name'] = 'Copy of ' + updated_json['name']
+
+        payload = verifyReleaseGuidFields(updated_json, auth_header)
+        if ''.join(map(str, updated_json)).find('required') != -1:
+            pp.pprint(updated_json)
+            exit('POST requires certain fields')
+
+        r = requests.post(plutoraBaseUrl+'/releases', data=payload, headers=auth_header)
+        if r.status_code != 201:
+            print('Post new release status code: %i' % r.status_code)
+            print('\nupdateReleasePlutoraDB.py: too bad! - [failed on Plutora create POST]')
+            print("header: ", authHeader)
+            pp.pprint(r.json())
+            exit('Sorry, unrecoverable error; gotta go...')
+        else:
+            pp.pprint(r.json())
+    except:
+        print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
+        exit('Error during API processing [POST]')
+
+# Vestigal; originally, could cause crash if --noguid is supplied on the command-line
+# noop'd it out, below, for safety's sake
 def consoleFillFields(db_fields):
     i = 0
     table_entries = []
@@ -199,11 +256,14 @@ class CreateMenu:
         quit_btn = Button(upper_frame, text="Done", command=root.quit)
         quit_btn.pack(side=RIGHT)
 
+#        verify_btn = Button(upper_frame, text="Verify Fields", command=root.quit)
+#        verify_btn.pack(side=RIGHT)
+
         lower_frame = Frame(root)
         lower_frame.pack(side=BOTTOM)
 
         entries = OrderedDict()
-        for field in fields:
+        for field in self.fields:
             row = Frame(lower_frame)
             lbl = Label(row, text=field+': ', anchor='w')
             ent = Entry(row)
@@ -222,22 +282,66 @@ class CreateMenu:
 
         return entries
 
-    def __init__(self, db_fields):
+    def __init__(self, db_fields, auth_header):
+        self.auth_header = auth_header
         self.root = root = Tk()
         self.entries = self.makeform(root, db_fields)
         root.mainloop()
 
+def createRelease(post_tgt_values_file, authHeader):
+    try:
+        with open(post_tgt_values_file) as json_data_file:
+            original_fields = json.load(json_data_file, object_pairs_hook=OrderedDict)
+        if results.gui:
+            updated_field_values = CreateMenu(original_fields, authHeader).fetch()
+        else:
+            #                updated_field_values = consoleFillFields(fields)
+            print("Unimlemented:", "Non-gui functionality is currently unimplemented")
 
+        updateReleasePlutoraDB(original_fields, updated_field_values, authHeader)
+
+    except Exception,ex:
+        # ex.msg is a string that looks like a dictionary
+        print "EXCEPTION: %s " % ex.msg
+        exit('Error during API processing [POST]')
+
+
+def createSystem(post_tgt_values_filename, auth_header):
+    # Set up JSON prettyPrinting
+    pp = pprint.PrettyPrinter(indent=4)
+
+    # Setup to query Maersk Plutora instances
+    plutoraBaseUrl= 'https://usapi.plutora.com'
+    postSystem = '/systems'
+
+    # OK; try creating a new system...
+    try:
+        authHeader["content-type"] = "application/json"
+
+        with open(post_tgt_values_file) as json_data_file:
+            original_fields = json.load(json_data_file, object_pairs_hook=OrderedDict)
+        if results.gui:
+            updated_field_values = CreateMenu(original_fields, authHeader).fetch()
+        else:
+            #                updated_field_values = consoleFillFields(fields)
+            print("Unimlemented:", "Non-gui functionality is currently unimplemented")
+
+        updateSystemPlutoraDB(original_fields, updated_field_values, authHeader)
+
+    except Exception,ex:
+        # ex.msg is a string that looks like a dictionary
+        print "EXCEPTION: %s " % ex.msg
+        exit('Error during API processing [POST]')
+        
 if __name__ == '__main__':
     # parse commandline and get appropriate passwords
     #    accepted format is python plutoraGuiPy.py -f <config fiiename>...
     #
     parser = argparse.ArgumentParser(description='Get user/password and configuration-information')
     parser.add_argument('-i', action='store', dest='config_filename', help='initial Config filename ')
-    parser.add_argument('-p', action='store', dest='post_target_values',
+    parser.add_argument('-p', action='store', dest='post_tgt_values_file',
                         help='filename containing JSON object prototype')
     parser.add_argument('-c', action='store', dest='release_id_to_copy', help='release-id of release to copy')
-    parser.add_argument('-f', action='store', dest='source_file', help='name of file containing field-names')
     parser.add_argument("--gui", default=True, action='store_true')
     results = parser.parse_args()
 
@@ -250,12 +354,7 @@ if __name__ == '__main__':
 # do an xmltodict, select xml2json(doc["html"]["body"]["div"]["section"][1]["div"]["div"])
 # and then a xml2python to get field-names/types
 
-    # as it turns out the -f parameter is currently used as the file from which to copy the initial values
-    # (this would mean, of course, that -f & -c should be mutually-exclusive).
-    source_file = results.source_file
-    if results.source_file == None:
-        source_file = 'field_names.txt'
-    elif results.release_id_to_copy != None:
+    if results.release_id_to_copy != None:
         release_id_to_copy = results.release_id_to_copy
 
     config_filename = results.config_filename
@@ -274,11 +373,14 @@ if __name__ == '__main__':
             'password': data["credentials"]["password"]
         }
 
-        # Open field-names file
-        with open(source_file) as fnames:
-            fields = json.load(fnames, object_pairs_hook=OrderedDict)
-        original_fields = fields
-        post_target_values = results.post_target_values
+        post_tgt_values_file = results.post_tgt_values_file
+        authHeader = getAuth(credentials)
+
+        if post_tgt_values_file.find('.sys') != -1:
+            createSystem(post_tgt_values_file, authHeader)
+
+        if post_tgt_values_file.find('.rls') != -1:
+            createRelease(post_tgt_values_file, authHeader)
 
 # in terms of getting POST prototype, can we grab it from: https://usapi.plutora.com/Help/Api/POST-releases
 # body/div/2nd section/P/H2/H3/Pa/H3/P/A/TABLE/H3/Div/H2/H3/P/A/TABLE/H3/Div/Div/span/pre/#text
@@ -286,27 +388,19 @@ if __name__ == '__main__':
 # d = json.loads(doc["html"]["body"]["div"]["section"][1]["div"]["div"][1]['div'][0]['pre']['#text'],object_pairs_hook=OrderedDict)
 
         # We're currently simply using the fields 'garnered' from the JSON parameter file-read.
-        if (not post_target_values and results.release_id_to_copy != None):
-            authHeader = getAuth(credentials)
-            release_copy = guidFromValue('/releases/'+results.release_id_to_copy, 'raw_get', 0, authHeader )
-#            fields = json.load(guidFromValue('/releases/'+results.release_id_to_copy, 'raw_get', 0, authHeader ), object_pairs_hook=OrderedDict)
+        if (not post_tgt_values_file and results.release_id_to_copy != None):
+#            original_fields = json.load(getOrGetGuidFromValue('/releases/'+results.release_id_to_copy, 'raw_get', 0, authHeader ), object_pairs_hook=OrderedDict)
+            release_copy = getOrGetGuidFromValue('/releases/'+results.release_id_to_copy, 'raw_get', 0, authHeader )
             original_fields = json.loads(release_copy, object_pairs_hook=OrderedDict)
-            updated_field_values = CreateMenu(original_fields).fetch()
-        else:
-            with open(post_target_values) as json_data_file:
-                fields = json.load(json_data_file, object_pairs_hook=OrderedDict)
-            if results.gui:
-                updated_field_values = CreateMenu(fields).fetch()
-            else:
-                updated_field_values = consoleFillFields(fields)
+            updated_field_values = CreateMenu(original_fields, authHeader).fetch()
 
-        updatePlutoraDB(credentials, original_fields, updated_field_values)
+        updateReleasePlutoraDB(original_fields, updated_field_values, authHeader)
 
     except Exception as e:
          # ex.msg is a string that looks like a dictionary
          e = sys.exc_info()[0]
          print "EXCEPTION: %s" % e
-#         exit('couldnt open file {0}'.format(post_target_values))
+#         exit('couldnt open file {0}'.format(post_tgt_values_file))
 
 
 
