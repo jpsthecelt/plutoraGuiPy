@@ -1,0 +1,17 @@
+{ 
+    "additionalInformation": [],
+    "identifier": "PR-9999",
+    "name": "New Maersk Release #3457 (initiated by API-jps)",
+    "summary": "This is the latest release in the plethora of Maersk IT projects",
+    "releaseTypeId": "Major",
+    "location": "SanFran",
+    "releaseStatusTypeId": "In Progress",
+    "releaseRiskLevelId": "Medium",
+    "implementationDate": "2017-01-09T03:17:38.9137257+00:00",
+    "displayColor": "#8FCD50",
+    "organizationId": "Maersk Line IT",
+    "managerId": "john.singer@plutora.com",
+    "parentReleaseId": "",
+    "plutoraReleaseType": "Enterprise",
+    "releaseProjectType": "None"
+}
