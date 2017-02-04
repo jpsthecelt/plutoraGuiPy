@@ -3,3 +3,7 @@
 *.iml
 *.csv
 *.xlsx
+*.rls
+*.sys
+*.env
+*.chg
