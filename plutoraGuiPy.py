@@ -551,7 +551,7 @@ if __name__ == '__main__':
         # commandline must be of the form /environments/<guid>...
         delEntity = results.delete_entity
         if delEntity != None:
-            deleteEntity(delEntity, authHeader)
+            print(deleteEntity(delEntity, authHeader))
             exit('gone...')
 
         # Given a filename-on-the-commandline, cycle through the different types of files (suffixes)
