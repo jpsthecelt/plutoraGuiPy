@@ -26,6 +26,13 @@ def names(name):
 def isGuid(value):
     return all (c in set(string.hexdigits+'-') for c in value)
 
+# Decide if the current argument is a guid or some other field
+def isColor(value):
+    if len(value) == 7 and value[0] == '#':
+        return all (c in set(string.hexdigits+'#') for c in value)
+    else:
+        return False
+
 # Given a 'sub-Url', do a get and determine if the element is a match to the supplied value.
 # if not, emit error-message, else emit proper Guid
 def getOrGetGuidFromValue(parmDesc, elem, value, header ):
@@ -150,9 +157,7 @@ def verifySystemGuidFields(updated_field_values, auth_header):
     return json.dumps(updated_field_values)
 
 def verifyEnvironmentGuidFields(updated_field_values, auth_header):
-    # 'sanity-check' name/id/addn'l info & required fields
-    if updated_field_values['additionalInformation'] == None or updated_field_values['additionalInformation'] == '[]':
-        updated_field_values['additionalInformation'] = []
+    # 'sanity-check' name/id info & required fields
 
     value = updated_field_values['name']
     if value == None or isGuid(value):
@@ -162,17 +167,35 @@ def verifyEnvironmentGuidFields(updated_field_values, auth_header):
     if value == None or isGuid(value):
         return '{Vendor is required}'
 
-    available_status_types = {'Active', 'Inactive'}
-    value = updated_field_values['status']
-    if not value in available_status_types:
-        return  '{SystemStatusTypeId is required and must be one of %s}' % (','.join(map(str,available_status_types)))
+    value = updated_field_values['linkedSystemId']
+    if value == None or not isGuid(value):
+        guid = getOrGetGuidFromValue('/systems', 'name', value, auth_header)
+        if not isGuid(guid): return '{LinkedSystemId is required}'
+        else: updated_field_values['linkedSystemId'] = guid
 
-    value = updated_field_values['organizationId']
+    value = updated_field_values['environmentStatusId']
     if not isGuid(value):
-        guid = getOrGetGuidFromValue('/organizations', 'name', value, auth_header)
-        if not isGuid(guid): return '{organizationId is required}'
-        else: updated_field_values['organizationId'] = guid
+        guid = getOrGetGuidFromValue('/lookupfields/EnvironmentStatus', 'name', value, auth_header)
+        if not isGuid(guid): return '{EnvironmentStatus is required}'
+        else: updated_field_values['EnvironmentStatus'] = guid
+        return  '{EnvironmentStatus is required }'
 
+    value = updated_field_values['usageWorkItemId']
+    if not isGuid(value):
+        guid = getOrGetGuidFromValue('/lookupfields/UsedForWorkItem', 'value', value, auth_header)
+        if not isGuid(guid): return '{UsedForWorkItem is required}'
+        else: updated_field_values['usageWorkItemId'] = guid
+
+    value = updated_field_values['isSharedEnvironment']
+    available_status_types = {'True', 'False'}
+    if not value in available_status_types:
+        return  '{isSharedEnvironment is required and must be one of %s}' % (','.join(map(str,available_status_types)))
+    else:
+        value = eval(updated_field_values['isSharedEnvironment'])
+
+    value = updated_field_values['color']
+    if not isColor(value):
+        return  '{Color is required and must be in the format #HHHHHH}'
     return json.dumps(updated_field_values)
 
 def verifyChangesGuidFields(updated_field_values, auth_header):
@@ -257,7 +280,7 @@ def updateEnvironmentPlutoraDB(starting_fields, updated_json, auth_header):
             pp.pprint(updated_json)
             exit('POST requires certain fields')
 
-        r = requests.post(plutoraBaseUrl+'/releases', data=payload, headers=auth_header)
+        r = requests.post(plutoraBaseUrl+'/environments', data=payload, headers=auth_header)
         if r.status_code != 201:
             print('Post new release status code: %i' % r.status_code)
             print('\nupdateReleasePlutoraDB.py: too bad! - [failed on Plutora create POST]')
@@ -418,7 +441,7 @@ def createEnvironment(post_tgt_values_filename, auth_header):
 
     # Setup to query Maersk Plutora instances
     plutoraBaseUrl= 'https://usapi.plutora.com'
-    postSystem = '/systems'
+    postEnviron = '/environments'
 
     # OK; try creating a new system...
     try:
@@ -462,12 +485,32 @@ def createChanges(post_tgt_values_filename, auth_header):
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
         exit('Error during API processing [POST]')
 
+def deleteEntity(item2del, aHeader):
+    if '/environments/' in item2del:
+#        res = requests.delete(plutoraBaseUrl+item2del, headers=aHeader)
+        res = requests.request('DELETE',  plutoraBaseUrl+item2del, headers=aHeader)
+    elif '/releases/' in item2del:
+        res = requests.delete(plutoraBaseUrl+item2del, headers=aHeader)
+    elif '/systems/' in item2del:
+        res = requests.delete(plutoraBaseUrl+item2del, headers=aHeader)
+    elif '/changes/' in item2del:
+        res = requests.delete(plutoraBaseUrl+item2del, headers=aHeader)
+    else:
+        return '{ Delete: Bad ResourceName }'
+
+    if res.status_code != 200:
+        return res.json()
+    else:
+        return '{ failed to delete %s}' % res.text
+
+
 if __name__ == '__main__':
     # parse commandline and get appropriate passwords
     #    accepted format is python plutoraGuiPy.py -f <config fiiename>...
     #
     parser = argparse.ArgumentParser(description='Get user/password and configuration-information')
     parser.add_argument('-i', action='store', dest='config_filename', help='initial Config filename ')
+    parser.add_argument('-x', action='store', dest='delete_entity', help='entity to delete')
     parser.add_argument('-p', action='store', dest='post_tgt_values_file',
                         help='filename containing JSON object prototype')
     parser.add_argument('-c', action='store', dest='release_id_to_copy', help='release-id of release to copy')
@@ -504,6 +547,12 @@ if __name__ == '__main__':
 
         post_tgt_values_file = results.post_tgt_values_file
         authHeader = getAuth(credentials)
+
+        # commandline must be of the form /environments/<guid>...
+        delEntity = results.delete_entity
+        if delEntity != None:
+            deleteEntity(delEntity, authHeader)
+            exit('gone...')
 
         # Given a filename-on-the-commandline, cycle through the different types of files (suffixes)
         # calling the appropriate createX routine.
