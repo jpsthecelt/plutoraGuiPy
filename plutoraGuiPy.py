@@ -3,7 +3,6 @@ import argparse
 import pprint
 import json
 from Tkinter import *
-import tkMessageBox
 import sys
 import string
 from collections import OrderedDict
@@ -13,18 +12,18 @@ from collections import OrderedDict
 # This is a sample program to demonstrate programmatically grabbing JSON
 # objects from a file, verifying values, and POSTing them into Plutora
 # (note that -f and -c are mutually-exclusive; the first one on the command-line
-# takes precedence).
+# takes precedence). Additionally, once there's a -x on the command-line, all
+# further arguments are ignored.
 #
 plutoraBaseUrl = 'https://usapi.plutora.com'
 
 
-# return value from name-hash
-def names(name):
-    return name['value']
-
 # Decide if the current argument is a guid or some other field
 def isGuid(value):
-    return all (c in set(string.hexdigits+'-') for c in value)
+    if not value:
+        return False
+    else:
+        all (c in set(string.hexdigits+'-') for c in value)
 
 # Decide if the current argument is a guid or some other field
 def isColor(value):
@@ -48,8 +47,8 @@ def getOrGetGuidFromValue(parmDesc, elem, value, header ):
     lookup_id = [id_val for id_val in lookup_ids if id_val[elem] == value]
 
     if len(lookup_id) == 0:
-        # (note use of names function, above)
-        return 'must be one of %s' % (','.join(map(names,value)))
+        # (note use of names function, above) [decided to make this a lambda-function, instead]
+        return 'must be one of %s' % (','.join(map(lambda k: k['value'], value)))
     else:
         return lookup_id[0]['id']
 
@@ -224,93 +223,108 @@ def verifyChangesGuidFields(updated_field_values, auth_header):
 
     return json.dumps(updated_field_values)
 
-def updateSystemPlutoraDB(starting_fields, updated_json, auth_header):
+def updateSystemPlutoraDB(starting_fields, updated_json, is_copy, auth_header):
     pp = pprint.PrettyPrinter(indent=4)
 
     try:
         # So, after generating payload, below, if return has the text 'required' in it, print out the error & quit
-        payload = verifySystemGuidFields(updated_json, auth_header)
-        if ''.join(map(str, payload)).find('required') != -1:
-            pp.pprint(payload)
-            exit('POST requires certain fields')
+        if is_copy:
+            payload = json.dumps(updated_json)
+        else:
+            payload = verifySystemGuidFields(updated_json, auth_header)
+            if ''.join(map(str, payload)).find('required') != -1:
+                pp.pprint(payload)
+                exit('POST requires certain fields')
 
         r = requests.post(plutoraBaseUrl+'/systems', data=payload, headers=auth_header)
         if r.status_code != 201:
             print('Post new release status code: %i' % r.status_code)
-            print('\nupdateReleasePlutoraDB.py: too bad! - [failed on Plutora create POST]')
-            print("header: ", authHeader)
+            print('\nupdateSystemPlutoraDB.py: too bad! - [failed on Plutora create POST]')
+            print("header: ", auth_header)
             pp.pprint(r.json())
             exit('Sorry, unrecoverable error; gotta go...')
         else:
-            pp.pprint(r.json())
+            return '{System: %s/%s}' % (r.json()['name'], r.json()['id'])
+
     except:
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
         exit('Error during API processing [POST]')
 
 # Given the original values (and any we supplied in the GUI, verify consistency
 # & go update the DB
-def updateReleasePlutoraDB(starting_fields, updated_json, auth_header):
+def updateReleasePlutoraDB(starting_fields, updated_json, is_copy, auth_header):
     pp = pprint.PrettyPrinter(indent=4)
 
     try:
-        payload = verifyReleaseGuidFields(updated_json, auth_header)
-        if ''.join(map(str, updated_json)).find('required') != -1:
-            pp.pprint(updated_json)
-            exit('POST requires certain fields')
+        if is_copy:
+            payload = json.dumps(updated_json)
+        else:
+            payload = verifyReleaseGuidFields(updated_json, auth_header)
+            if ''.join(map(str, updated_json)).find('required') != -1:
+                pp.pprint(updated_json)
+                exit('POST requires certain fields')
 
         r = requests.post(plutoraBaseUrl+'/releases', data=payload, headers=auth_header)
         if r.status_code != 201:
             print('Post new release status code: %i' % r.status_code)
             print('\nupdateReleasePlutoraDB.py: too bad! - [failed on Plutora create POST]')
-            print("header: ", authHeader)
+            print("header: ", auth_header)
             pp.pprint(r.json())
             exit('Sorry, unrecoverable error; gotta go...')
         else:
-            pp.pprint(r.json())
+            return 'Release: %s/%s}' % (r.json()['name'],r.json()['id'])
+
     except:
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
         exit('Error during API processing [POST]')
 
-def updateEnvironmentPlutoraDB(starting_fields, updated_json, auth_header):
+def updateEnvironmentPlutoraDB(starting_fields, updated_json, is_copy, auth_header):
     pp = pprint.PrettyPrinter(indent=4)
 
     try:
-        payload = verifyEnvironmentGuidFields(updated_json, auth_header)
-        if ''.join(map(str, updated_json)).find('required') != -1:
-            pp.pprint(updated_json)
-            exit('POST requires certain fields')
+        if is_copy:
+            payload = json.dumps(updated_json)
+        else:
+            payload = verifyEnvironmentGuidFields(updated_json, auth_header)
+            if ''.join(map(str, updated_json)).find('required') != -1:
+                pp.pprint(updated_json)
+                exit('POST requires certain fields')
 
         r = requests.post(plutoraBaseUrl+'/environments', data=payload, headers=auth_header)
         if r.status_code != 201:
             print('Post new release status code: %i' % r.status_code)
             print('\nupdateReleasePlutoraDB.py: too bad! - [failed on Plutora create POST]')
-            print("header: ", authHeader)
+            print("header: ", auth_header)
             pp.pprint(r.json())
             exit('Sorry, unrecoverable error; gotta go...')
         else:
-            pp.pprint(r.json())
+            return '{Environment: %s/%s}' % (r.json()['name'], r.json()['id'])
+
     except:
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
         exit('Error during API processing [POST]')
 
-def updateChangesPlutoraDB(starting_fields, updated_json, auth_header):
+def updateChangesPlutoraDB(starting_fields, updated_json, is_copy, auth_header):
     pp = pprint.PrettyPrinter(indent=4)
 
     try:
-        payload = verifyChangesGuidFields(updated_json, auth_header)
-        if ''.join(map(str, updated_json)).find('required') != -1:
-            pp.pprint(updated_json)
-            exit('POST requires certain fields')
+        if is_copy:
+            payload = json.dumps(updated_json)
+        else:
+            payload = verifyChangesGuidFields(updated_json, auth_header)
+            if ''.join(map(str, updated_json)).find('required') != -1:
+                pp.pprint(updated_json)
+                exit('POST requires certain fields')
 
-        r = requests.post(plutoraBaseUrl+'/releases', data=payload, headers=auth_header)
+        r = requests.post(plutoraBaseUrl+'/changes', data=payload, headers=auth_header)
         if r.status_code != 201:
             print('Post new release status code: %i' % r.status_code)
-            print('\nupdateReleasePlutoraDB.py: too bad! - [failed on Plutora create POST]')
-            print("header: ", authHeader)
+            print('\nupdateChangesPlutoraDB.py: too bad! - [failed on Plutora create POST]')
+            print("header: ", auth_header)
             pp.pprint(r.json())
             exit('Sorry, unrecoverable error; gotta go...')
         else:
-            pp.pprint(r.json())
+            return '{Change: %s/%s}' % (r.json()['name'], r.json()['id'])
     except:
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
         exit('Error during API processing [POST]')
@@ -392,25 +406,22 @@ class CreateMenu:
         self.entries = self.makeform(root, db_fields)
         root.mainloop()
 
-def createRelease(post_tgt_values_file, authHeader):
+def createRelease(use_gui, post_tgt_values_file, auth_header):
     try:
         with open(post_tgt_values_file) as json_data_file:
-            original_fields = json.load(json_data_file, object_pairs_hook=OrderedDict)
-        if results.gui:
-            updated_field_values = CreateMenu(original_fields, authHeader).fetch()
-        else:
-            #                updated_field_values = consoleFillFields(fields)
-            print("Unimlemented:", "Non-gui functionality is currently unimplemented")
+            org_fields = updated_fields = json.load(json_data_file, object_pairs_hook=OrderedDict)
+        if use_gui:
+            updated_fields = CreateMenu(org_fields, auth_header).fetch()
 
-        updateReleasePlutoraDB(original_fields, updated_field_values, authHeader)
+        updateReleasePlutoraDB(org_fields, updated_fields, auth_header)
 
-    except Exception,ex:
-        # ex.msg is a string that looks like a dictionary
-        print "EXCEPTION: %s " % ex.msg
+    except Exception as e:
+        print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0], sys.exc_info()[1].message)
+        print "Exception: ", e
         exit('Error during API processing [POST]')
 
 
-def createSystem(post_tgt_values_filename, auth_header):
+def createSystem(use_gui, post_tgt_values_filename, auth_header):
     # Set up JSON prettyPrinting
     pp = pprint.PrettyPrinter(indent=4)
 
@@ -420,47 +431,41 @@ def createSystem(post_tgt_values_filename, auth_header):
 
     # OK; try creating a new system...
     try:
-        with open(post_tgt_values_file) as json_data_file:
-            original_fields = json.load(json_data_file, object_pairs_hook=OrderedDict)
-        if results.gui:
-            updated_field_values = CreateMenu(original_fields, authHeader).fetch()
-        else:
-            #                updated_field_values = consoleFillFields(fields)
-            print("Unimlemented:", "Non-gui functionality is currently unimplemented")
+        with open(post_tgt_values_filename) as json_data_file:
+            org_fields = updated_fields = json.load(json_data_file, object_pairs_hook=OrderedDict)
+        if use_gui:
+            updated_fields = CreateMenu(org_fields, auth_header).fetch()
 
-        updateSystemPlutoraDB(original_fields, updated_field_values, authHeader)
+        updateSystemPlutoraDB(org_fields, updated_fields, auth_header)
 
-    except Exception,ex:
-        # ex.msg is a string that looks like a dictionary
-        print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
+    except Exception as e:
+        print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0], sys.exc_info()[1].message)
+        print "Exception: ", e
         exit('Error during API processing [POST]')
 
-def createEnvironment(post_tgt_values_filename, auth_header):
+def createEnvironment(use_gui, post_tgt_values_filename, auth_header):
     # Set up JSON prettyPrinting
     pp = pprint.PrettyPrinter(indent=4)
 
-    # Setup to query Maersk Plutora instances
+    # Setup to query Plutora instances
     plutoraBaseUrl= 'https://usapi.plutora.com'
     postEnviron = '/environments'
 
     # OK; try creating a new system...
     try:
-        with open(post_tgt_values_file) as json_data_file:
-            original_fields = json.load(json_data_file, object_pairs_hook=OrderedDict)
-        if results.gui:
-            updated_field_values = CreateMenu(original_fields, authHeader).fetch()
-        else:
-            #                updated_field_values = consoleFillFields(fields)
-            print("Unimlemented:", "Non-gui functionality is currently unimplemented")
+        with open(post_tgt_values_filename) as json_data_file:
+            org_fields = updated_fields = json.load(json_data_file, object_pairs_hook=OrderedDict)
+        if use_gui:
+            updated_fields = CreateMenu(org_fields, auth_header).fetch()
 
-        updateEnvironmentPlutoraDB(original_fields, updated_field_values, authHeader)
+        updateEnvironmentPlutoraDB(org_fields, updated_fields, auth_header)
 
-    except Exception,ex:
-        # ex.msg is a string that looks like a dictionary
+    except Exception as e:
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
+        print "Exception: ", e
         exit('Error during API processing [POST]')
 
-def createChanges(post_tgt_values_filename, auth_header):
+def createChanges(use_gui, post_tgt_values_filename, auth_header):
     # Set up JSON prettyPrinting
     pp = pprint.PrettyPrinter(indent=4)
 
@@ -470,51 +475,48 @@ def createChanges(post_tgt_values_filename, auth_header):
 
     # OK; try creating a new system...
     try:
-        with open(post_tgt_values_file) as json_data_file:
-            original_fields = json.load(json_data_file, object_pairs_hook=OrderedDict)
-        if results.gui:
-            updated_field_values = CreateMenu(original_fields, authHeader).fetch()
-        else:
-            #                updated_field_values = consoleFillFields(fields)
-            print("Unimlemented:", "Non-gui functionality is currently unimplemented")
+        with open(post_tgt_values_filename) as json_data_file:
+            org_fields = updated_fields = json.load(json_data_file, object_pairs_hook=OrderedDict)
+        if use_gui:
+            updated_fields = CreateMenu(org_fields, authHeader).fetch()
 
-        updateChangesPlutoraDB(original_fields, updated_field_values, authHeader)
+        updateChangesPlutoraDB(org_fields, updated_fields, auth_header)
 
-    except Exception,ex:
-        # ex.msg is a string that looks like a dictionary
+    except Exception as e:
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
+        print "Exception: ", e
         exit('Error during API processing [POST]')
 
-def deleteEntity(item2del, aHeader):
+def deleteEntity(item2del, auth_header):
     if '/environments/' in item2del:
-#        res = requests.delete(plutoraBaseUrl+item2del, headers=aHeader)
-        res = requests.request('DELETE',  plutoraBaseUrl+item2del, headers=aHeader)
+        res = requests.delete(plutoraBaseUrl+item2del, headers=auth_header)
     elif '/releases/' in item2del:
-        res = requests.delete(plutoraBaseUrl+item2del, headers=aHeader)
+        res = requests.delete(plutoraBaseUrl+item2del, headers=auth_header)
     elif '/systems/' in item2del:
-        res = requests.delete(plutoraBaseUrl+item2del, headers=aHeader)
+        res = requests.delete(plutoraBaseUrl+item2del, headers=auth_header)
     elif '/changes/' in item2del:
-        res = requests.delete(plutoraBaseUrl+item2del, headers=aHeader)
+        res = requests.delete(plutoraBaseUrl+item2del, headers=auth_header)
     else:
         return '{ Delete: Bad ResourceName }'
 
     if res.status_code != 200:
         return res.json()
     else:
-        return '{ failed to delete %s}' % res.text
+        return '{ deleted %s}' % item2del
 
 
 if __name__ == '__main__':
     # parse commandline and get appropriate passwords
-    #    accepted format is python plutoraGuiPy.py -f <config fiiename>...
+    #    accepted format is python plutoraGuiPy.py -i <config fiiename>...
     #
     parser = argparse.ArgumentParser(description='Get user/password and configuration-information')
     parser.add_argument('-i', action='store', dest='config_filename', help='initial Config filename ')
     parser.add_argument('-x', action='store', dest='delete_entity', help='entity to delete')
     parser.add_argument('-p', action='store', dest='post_tgt_values_file',
                         help='filename containing JSON object prototype')
-    parser.add_argument('-c', action='store', dest='release_id_to_copy', help='release-id of release to copy')
-    parser.add_argument("--gui", default=True, action='store_true')
+    parser.add_argument('-c', action='store', dest='guid_id_to_copy', help='release-id of release to copy')
+    parser.add_argument("--gui", default=False, action='store_true')
+    parser.add_argument("--datepick", default=False, action='store_true')
     results = parser.parse_args()
 
     if len(sys.argv[1:]) < 1:
@@ -526,12 +528,12 @@ if __name__ == '__main__':
 # do an xmltodict, select xml2json(doc["html"]["body"]["div"]["section"][1]["div"]["div"])
 # and then a xml2python to get field-names/types
 
-    if results.release_id_to_copy != None:
-        release_id_to_copy = results.release_id_to_copy
-
     config_filename = results.config_filename
     if results.config_filename == None:
         config_filename = 'credentials.cfg'
+
+    if results.gui and results.datepick:
+        print('Not Implemented, yet')
 
     # If we don't specify a configfile on the commandline, assume one & try accessing
     # using the specified/assumed configfilename, grab ClientId & Secret from manual setup of Plutora Oauth authorization.
@@ -548,46 +550,58 @@ if __name__ == '__main__':
         post_tgt_values_file = results.post_tgt_values_file
         authHeader = getAuth(credentials)
 
-        # commandline must be of the form /environments/<guid>...
+        # Handle the case where we must delete an entity. Note that the
+        # commandline must be similar to the form '-x /environments/<guid>'...
         delEntity = results.delete_entity
-        if delEntity != None:
+        if delEntity:
             print(deleteEntity(delEntity, authHeader))
-            exit('gone...')
+            exit('done, for now...')
 
-        # Given a filename-on-the-commandline, cycle through the different types of files (suffixes)
+        # Given a filename or guid-on-the-commandline, cycle through the different types of files (suffixes)
         # calling the appropriate createX routine.
         available_suffix_types = ['.rls', '.sys', '.env', '.chg']
-        if post_tgt_values_file != None and len(filter(lambda k: k in post_tgt_values_file, available_suffix_types)) > 0:
+        if post_tgt_values_file and len(filter(lambda k: k in post_tgt_values_file, available_suffix_types)) > 0:
             if post_tgt_values_file.find('.sys') != -1:
-                createSystem(post_tgt_values_file, authHeader)
-
-            if post_tgt_values_file.find('.rls') != -1:
-                createRelease(post_tgt_values_file, authHeader)
-
-            if post_tgt_values_file.find('.env') != -1:
-                createEnvironment(post_tgt_values_file, authHeader)
-
-            if post_tgt_values_file.find('.rls') != -1:
-                createChanges(post_tgt_values_file, authHeader)
+                createSystem(results.gui, post_tgt_values_file, authHeader)
+            elif post_tgt_values_file.find('.rls') != -1:
+                createRelease(results.gui, post_tgt_values_file, authHeader)
+            elif post_tgt_values_file.find('.env') != -1:
+                createEnvironment(results.gui, post_tgt_values_file, authHeader)
+            elif post_tgt_values_file.find('.rls') != -1:
+                createChanges(results.gui, post_tgt_values_file, authHeader)
+            else:
+                print '{expected one of %s file suffixes}' % (','.join(map(str,available_suffix_types)))
         else:
-# in terms of getting POST prototype, can we grab it from: https://usapi.plutora.com/Help/Api/POST-releases
+# Although it would be possible to get a POST prototype from https://usapi.plutora.com/Help/Api/POST-releases
 # body/div/2nd section/P/H2/H3/Pa/H3/P/A/TABLE/H3/Div/H2/H3/P/A/TABLE/H3/Div/Div/span/pre/#text
-# OR, if doc is set to x.text, maybe something like:
-# d = json.loads(doc["html"]["body"]["div"]["section"][1]["div"]["div"][1]['div'][0]['pre']['#text'],object_pairs_hook=OrderedDict)
+# for example, we're just assuming that the initial values from the post_X_values.YYY file includes all the
+# necessary fields with the expected values, otherwise the update will fail.
 
-            # We're currently simply using the fields 'garnered' from the JSON parameter file-read.
-# ****** TODO: Have to figure a way to do systems, environments, releases, and changes, here
-            if (not post_tgt_values_file and results.release_id_to_copy != None):
-                #  original_fields = json.load(getOrGetGuidFromValue('/releases/'+results.release_id_to_copy, 'raw_get', 0, authHeader ), object_pairs_hook=OrderedDict)
-                release_copy = getOrGetGuidFromValue('/releases/'+results.release_id_to_copy, 'raw_get', 0, authHeader )
-                original_fields = json.loads(release_copy, object_pairs_hook=OrderedDict)
-                updated_field_values = CreateMenu(original_fields, authHeader).fetch()
-                updateReleasePlutoraDB(original_fields, updated_field_values, authHeader)
+# if we were trying to grab a prototype from the help web-page and if doc was set to x.text, maybe we could do
+# something like: d = json.loads(doc["html"]["body"]["div"]["section"][1]["div"]["div"][1]['div'][0]['pre']['#text'],object_pairs_hook=OrderedDict)
+
+            item2copy = results.guid_id_to_copy
+            # As mentioned above, notice We're currently simply using the fields 'garnered' from the JSON parameter file-read.
+            if (not post_tgt_values_file and item2copy):
+                isCopy = True
+                entity_copy = getOrGetGuidFromValue(item2copy, 'raw_get', 0, authHeader )
+                original_fields = updated_field_values = json.loads(entity_copy, object_pairs_hook=OrderedDict)
+                if results.gui:
+                    updated_field_values = CreateMenu(original_fields, authHeader).fetch()
+
+                if '/environments/' in item2copy:
+                    print(updateEnvironmentPlutoraDB(original_fields, updated_field_values, isCopy, authHeader))
+                elif '/releases/' in item2copy:
+                    print(updateReleasePlutoraDB(original_fields, updated_field_values, isCopy, authHeader))
+                elif '/systems/' in item2copy:
+                    print(updateSystemPlutoraDB(original_fields, updated_field_values, isCopy, authHeader))
+                elif '/changes/' in item2copy:
+                    print(updateChangesPlutoraDB(original_fields, updated_field_values, isCopy, authHeader))
+                else:
+                    print '{ copy: Bad GuidName }'
 
     except Exception as e:
          # ex.msg is a string that looks like a dictionary
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0], sys.exc_info()[1].message)
-#         exit('couldnt open file {0}'.format(post_tgt_values_file))
-
-
+        print "Exception: ", e
 
