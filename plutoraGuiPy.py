@@ -24,7 +24,7 @@ def isGuid(value):
     if not value:
         return False
     else:
-        all (c in set(string.hexdigits+'-') for c in value)
+        return all (c in set(string.hexdigits+'-') for c in value)
 
 # Decide if the current argument is a guid or some other field
 def isColor(value):
@@ -164,47 +164,47 @@ def verifySystemGuidFields(updated_field_dict, auth_header):
 
     return json.dumps(updated_field_dict)
 
-def verifyEnvironmentGuidFields(updated_field_values, auth_header):
+def verifyEnvironmentGuidFields(updated_fields_dict, auth_header):
     # 'sanity-check' name/id info & required fields
 
-    value = updated_field_values['name']
+    value = updated_fields_dict['name']
     if value == None or isGuid(value):
         return '{Name is required}'
 
-    value = updated_field_values['vendor']
+    value = updated_fields_dict['vendor']
     if value == None or isGuid(value):
         return '{Vendor is required}'
 
-    value = updated_field_values['linkedSystemId']
+    value = updated_fields_dict['linkedSystemId']
     if value == None or not isGuid(value):
         guid = getOrGetGuidFromValue('/systems', 'name', value, auth_header)
         if not isGuid(guid): return '{LinkedSystemId is required}'
-        else: updated_field_values['linkedSystemId'] = guid
+        else: updated_fields_dict['linkedSystemId'] = guid
 
-    value = updated_field_values['environmentStatusId']
+    value = updated_fields_dict['environmentStatusId']
     if not isGuid(value):
         guid = getOrGetGuidFromValue('/lookupfields/EnvironmentStatus', 'name', value, auth_header)
         if not isGuid(guid): return '{EnvironmentStatus is required}'
-        else: updated_field_values['EnvironmentStatus'] = guid
+        else: updated_fields_dict['EnvironmentStatus'] = guid
         return  '{EnvironmentStatus is required }'
 
-    value = updated_field_values['usageWorkItemId']
+    value = updated_fields_dict['usageWorkItemId']
     if not isGuid(value):
         guid = getOrGetGuidFromValue('/lookupfields/UsedForWorkItem', 'value', value, auth_header)
         if not isGuid(guid): return '{UsedForWorkItem is required}'
-        else: updated_field_values['usageWorkItemId'] = guid
+        else: updated_fields_dict['usageWorkItemId'] = guid
 
-    value = updated_field_values['isSharedEnvironment']
+    value = updated_fields_dict['isSharedEnvironment']
     available_status_types = BinaryTrueFalse
     if not value in available_status_types:
-        return  '{isSharedEnvironment is required and must be one of %s}' % (','.join(map(str,available_status_types)))
+        return  '{isSharedEnvironment is required and must be one of %s}' % (','.join(map(str, available_status_types)))
     else:
-        value = eval(updated_field_values['isSharedEnvironment'])
+        value = eval(updated_fields_dict['isSharedEnvironment'])
 
-    value = updated_field_values['color']
+    value = updated_fields_dict['color']
     if not isColor(value):
         return  '{Color is required and must be in the format #HHHHHH}'
-    return json.dumps(updated_field_values)
+    return json.dumps(updated_fields_dict)
 
 def verifyChangesGuidFields(updated_field_values, auth_header):
     # 'sanity-check' name/id/addn'l info & required fields
@@ -265,16 +265,17 @@ def updateReleasePlutoraDB(starting_fields, updated_json_dict, is_copy, auth_hea
 
     try:
         if is_copy:
-            updated_json_dict['additionalInformation'] = []
+            updated_json_dict['additionalInformation'] = cleanseNullListAsString(updated_json_dict['additionalInformation'])
+            if 'OrderedDict' in updated_json_dict['additionalInformation']:
+                updated_json_dict['additionalInformation'] = []
+
             mgrId = updated_json_dict['managerId']
             if not isGuid(mgrId):
                 guid = getOrGetGuidFromValue('/users', 'userName', mgrId, auth_header)
-                # TODO: Originally used if not isGuid(guid), and it kept coming back as 'None', when
-                #       it wasn't really, so I directly code for the error-message
-                if 'must be one' in guid:
-                    return '{ManagerId is required}'
-                else:
+                if isGuid(guid):
                     updated_json_dict['managerId'] = guid
+                else:
+                    return '{ManagerId is required}'
 
             payload = json.dumps(updated_json_dict)
         else:
@@ -360,30 +361,6 @@ def updateChangesPlutoraDB(starting_fields, updated_json_dict, is_copy, auth_hea
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
         exit('Error during API processing [POST]')
 
-# Vestigal; originally, could cause crash if --noguid is supplied on the command-line
-# noop'd it out, below, for safety's sake
-def consoleFillFields(db_fields):
-    i = 0
-    table_entries = []
-    for k in db_fields:
-        v = db_fields[k]
-        l = k+': '
-        orig = ""
-        if v == None:
-            e = '> ('+l+k+')'
-            # Keep table of keys/labels/entry-fields/original-values/updated-values
-            # (in this case, we're simply printing messages on the console and gathering
-            # input)
-        else:
-            e = v
-            orig = db_fields[k]
-
-        n = raw_input(e)
-        table_entries.append([k, l, e, orig, n])
-        i += 1
-
-    return table_entries
-
 # given a list of dictionary elements, create a menu which allows updating.
 class CreateMenu:
     def fetch(self):
@@ -392,23 +369,20 @@ class CreateMenu:
             new_values[entry] = self.entries[entry].get()
         return new_values
 
-    def makeform(self, root, db_fields):
-        root.title("Send Updated Form to Plutora")
+    def makeform(self, parent, db_fields):
+        parent.title("Send Updated Form to Plutora")
         self.fields = db_fields
 
-        upper_frame = Frame(root)
+        upper_frame = Frame(parent)
         upper_frame.pack(side=TOP)
 
         upper_top_label = Label(upper_frame, text="Update Plutora DB Record")
         upper_top_label.pack(side=TOP)
 
-        quit_btn = Button(upper_frame, text="Done", command=root.quit)
+        quit_btn = Button(upper_frame, text="Done", command=parent.quit)
         quit_btn.pack(side=RIGHT)
 
-#        verify_btn = Button(upper_frame, text="Verify Fields", command=root.quit)
-#        verify_btn.pack(side=RIGHT)
-
-        lower_frame = Frame(root)
+        lower_frame = Frame(parent)
         lower_frame.pack(side=BOTTOM)
 
         entries = OrderedDict()
@@ -489,7 +463,7 @@ def createEnvironment(use_gui, post_tgt_values_filename, auth_header):
         if use_gui:
             updated_fields = CreateMenu(org_fields, auth_header).fetch()
 
-        updateEnvironmentPlutoraDB(org_fields, updated_fields, auth_header)
+        updateEnvironmentPlutoraDB(org_fields, updated_fields, False, auth_header)
 
     except Exception as e:
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
@@ -591,13 +565,13 @@ if __name__ == '__main__':
         # calling the appropriate createX routine.
         available_suffix_types = ['.rls', '.sys', '.env', '.chg']
         if post_tgt_values_file and len(filter(lambda k: k in post_tgt_values_file, available_suffix_types)) > 0:
-            if post_tgt_values_file.find('.sys') != -1:
+            if '.sys' in post_tgt_values_file:
                 createSystem(results.gui, post_tgt_values_file, authHeader)
-            elif post_tgt_values_file.find('.rls') != -1:
+            elif '.rls' in post_tgt_values_file:
                 createRelease(results.gui, post_tgt_values_file, authHeader)
-            elif post_tgt_values_file.find('.env') != -1:
+            elif '.env' in post_tgt_values_file:
                 createEnvironment(results.gui, post_tgt_values_file, authHeader)
-            elif post_tgt_values_file.find('.rls') != -1:
+            elif '.chg' in post_tgt_values_file:
                 createChanges(results.gui, post_tgt_values_file, authHeader)
             else:
                 print '{expected one of %s file suffixes}' % (','.join(map(str,available_suffix_types)))
