@@ -224,15 +224,15 @@ def verifyChangesGuidFields(updated_field_values, auth_header):
 
     return json.dumps(updated_field_values)
 
-def updateSystemPlutoraDB(starting_fields, updated_json, is_copy, auth_header):
+def updateSystemPlutoraDB(starting_fields, updated_json_dict, is_copy, auth_header):
     pp = pprint.PrettyPrinter(indent=4)
 
     try:
         # So, after generating payload, below, if return has the text 'required' in it, print out the error & quit
         if is_copy:
-            payload = json.dumps(updated_json)
+            payload = json.dumps(updated_json_dict)
         else:
-            payload = verifySystemGuidFields(updated_json, auth_header)
+            payload = verifySystemGuidFields(updated_json_dict, auth_header)
             if ''.join(map(str, payload)).find('required') != -1:
                 pp.pprint(payload)
                 exit('POST requires certain fields')
@@ -320,16 +320,16 @@ def updateEnvironmentPlutoraDB(starting_fields, updated_json_dict, is_copy, auth
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
         exit('Error during API processing [POST]')
 
-def updateChangesPlutoraDB(starting_fields, updated_json, is_copy, auth_header):
+def updateChangesPlutoraDB(starting_fields, updated_json_dict, is_copy, auth_header):
     pp = pprint.PrettyPrinter(indent=4)
 
     try:
         if is_copy:
-            payload = json.dumps(updated_json)
+            payload = json.dumps(updated_json_dict)
         else:
-            payload = verifyChangesGuidFields(updated_json, auth_header)
-            if ''.join(map(str, updated_json)).find('required') != -1:
-                pp.pprint(updated_json)
+            payload = verifyChangesGuidFields(updated_json_dict, auth_header)
+            if ''.join(map(str, updated_json_dict)).find('required') != -1:
+                pp.pprint(updated_json_dict)
                 exit('POST requires certain fields')
 
         r = requests.post(plutoraBaseUrl+'/changes', data=payload, headers=auth_header)
