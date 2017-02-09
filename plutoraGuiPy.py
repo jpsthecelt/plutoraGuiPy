@@ -245,7 +245,7 @@ def updateSystemPlutoraDB(starting_fields, updated_json, is_copy, auth_header):
             pp.pprint(r.json())
             exit('Sorry, unrecoverable error; gotta go...')
         else:
-            return '{System: %s(%s)}' % (r.json()['name'], r.json()['id'])
+            return '{Created System: %s(%s)}' % (r.json()['name'], r.json()['id'])
 
     except:
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
@@ -282,7 +282,7 @@ def updateReleasePlutoraDB(starting_fields, updated_json_dict, is_copy, auth_hea
             pp.pprint(r.json())
             exit('Sorry, unrecoverable error; gotta go...')
         else:
-            return 'Release: %s(%s)}' % (r.json()['name'],r.json()['id'])
+            return '{Created Release: %s(%s)}' % (r.json()['name'],r.json()['id'])
 
     except:
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
@@ -312,7 +312,7 @@ def updateEnvironmentPlutoraDB(starting_fields, updated_json_dict, is_copy, auth
             pp.pprint(r.json())
             exit('Sorry, unrecoverable error; gotta go...')
         else:
-            return '{Copied to Environment: %s(%s)}' % (r.json()['name'], r.json()['id'])
+            return '{Created Environment: %s(%s)}' % (r.json()['name'], r.json()['id'])
 
     except:
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
@@ -338,7 +338,7 @@ def updateChangesPlutoraDB(starting_fields, updated_json, is_copy, auth_header):
             pp.pprint(r.json())
             exit('Sorry, unrecoverable error; gotta go...')
         else:
-            return '{Change: %s/%s}' % (r.json()['name'], r.json()['id'])
+            return '{Created Change: %s(%s)}' % (r.json()['name'], r.json()['id'])
     except:
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
         exit('Error during API processing [POST]')
