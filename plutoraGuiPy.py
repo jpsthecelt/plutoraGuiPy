@@ -586,7 +586,6 @@ if __name__ == '__main__':
         delEntity = results.delete_entity
         if delEntity:
             print(deleteEntity(delEntity, authHeader))
-            exit('done, for now...')
 
         # Given a filename or guid-on-the-commandline, cycle through the different types of files (suffixes)
         # calling the appropriate createX routine.
