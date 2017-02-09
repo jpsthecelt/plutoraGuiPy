@@ -33,6 +33,12 @@ def isColor(value):
     else:
         return False
 
+def cleanseNullListAsString(field):
+    if type(field) == str and (field == '[]' or field == None):
+        return []
+    else:
+        return field
+
 # Given a 'sub-Url', do a get and determine if the element is a match to the supplied value.
 # if not, emit error-message, else emit proper Guid
 def getOrGetGuidFromValue(parmDesc, elem, value, header ):
@@ -56,48 +62,49 @@ def getOrGetGuidFromValue(parmDesc, elem, value, header ):
 # verify that all mandatory release-fields have the appropriate values
 # and return JSON-string with appropriately updated data, including
 # substitutions of Guids for text values (in all Guid-fields).
-def verifyReleaseGuidFields(updated_field_values, hdr ):
+def verifyReleaseGuidFields(updated_fields_dict, hdr ):
 
     # 'sanity-check' name/id/addn'l info & required fields
-    if updated_field_values['additionalInformation'] == None or updated_field_values['additionalInformation'] == '[]':
-        updated_field_values['additionalInformation'] = []
+    updated_fields_dict['additionalInformation'] = cleanseNullListAsString(updated_fields_dict['additionalInformation'])
+    if 'OrderedDict' in updated_fields_dict['additionalInformation']:
+        updated_fields_dict['additionalInformation'] = []
 
-    value = updated_field_values['releaseTypeId']
+    value = updated_fields_dict['releaseTypeId']
     if value == None:
         return '{ReleaseTypeId is required}'
     if not isGuid(value):
         guid = getOrGetGuidFromValue('/lookupfields/ReleaseType', 'value', value, hdr )
         if not isGuid(guid): return '{ReleaseTypeId is required}'
-        else: updated_field_values['releaseTypeId'] = guid
+        else: updated_fields_dict['releaseTypeId'] = guid
 
-    if updated_field_values['location'] == None:
+    if updated_fields_dict['location'] == None:
         return '{Location is required}'
 
-    value = updated_field_values['releaseStatusTypeId']
+    value = updated_fields_dict['releaseStatusTypeId']
     if not isGuid(value):
         guid = getOrGetGuidFromValue('/lookupfields/ReleaseStatusType', 'value', value, hdr)
         if not isGuid(guid): return  '{ReleaseStatusTypeId is required}'
-        else: updated_field_values['releaseStatusTypeId'] = guid
+        else: updated_fields_dict['releaseStatusTypeId'] = guid
 
-    value = updated_field_values['releaseRiskLevelId']
+    value = updated_fields_dict['releaseRiskLevelId']
     if not isGuid(value):
         guid = getOrGetGuidFromValue('/lookupfields/ReleaseRiskLevel', 'value', value, hdr)
         if not isGuid(guid): return  '{ReleaseRiskLevelId is required}'
-        else: updated_field_values['releaseRiskLevelId'] = guid
+        else: updated_fields_dict['releaseRiskLevelId'] = guid
 
-    value = updated_field_values['organizationId']
+    value = updated_fields_dict['organizationId']
     if not isGuid(value):
         guid = getOrGetGuidFromValue('/organizations', 'name', value, hdr)
         if not isGuid(guid): return '{organizationId is required}'
-        else: updated_field_values['organizationId'] = guid
+        else: updated_fields_dict['organizationId'] = guid
 
-    value = updated_field_values['managerId']
+    value = updated_fields_dict['managerId']
     if not isGuid(value):
         guid = getOrGetGuidFromValue('/users', 'userName', value, hdr)
         if not isGuid(guid): return  '{managerID is required}'
-        else: updated_field_values['managerId'] = guid
+        else: updated_fields_dict['managerId'] = guid
 
-    return json.dumps(updated_field_values)
+    return json.dumps(updated_fields_dict)
 
 def getAuth(creds):
     clientid = creds['client_id']
@@ -130,31 +137,32 @@ def getAuth(creds):
     authHeader["content-type"] = "application/json"
     return authHeader
 
-def verifySystemGuidFields(updated_field_values, auth_header):
+def verifySystemGuidFields(updated_field_dict, auth_header):
     # 'sanity-check' name/id/addn'l info & required fields
-    if updated_field_values['additionalInformation'] == None or updated_field_values['additionalInformation'] == '[]':
-        updated_field_values['additionalInformation'] = []
+    updated_field_dict['additionalInformation'] = cleanseNullListAsString(updated_field_dict['additionalInformation'])
+    if 'OrderedDict' in updated_field_dict['additionalInformation']:
+        updated_field_dict['additionalInformation'] = []
 
-    value = updated_field_values['name']
+    value = updated_field_dict['name']
     if value == None or isGuid(value):
         return '{Name is required}'
 
-    value = updated_field_values['vendor']
+    value = updated_field_dict['vendor']
     if value == None or isGuid(value):
         return '{Vendor is required}'
 
     available_status_types = {'Active', 'Inactive'}
-    value = updated_field_values['status']
+    value = updated_field_dict['status']
     if not value in available_status_types:
         return  '{SystemStatusTypeId is required and must be one of %s}' % (','.join(map(str,available_status_types)))
 
-    value = updated_field_values['organizationId']
+    value = updated_field_dict['organizationId']
     if not isGuid(value):
         guid = getOrGetGuidFromValue('/organizations', 'name', value, auth_header)
         if not isGuid(guid): return '{organizationId is required}'
-        else: updated_field_values['organizationId'] = guid
+        else: updated_field_dict['organizationId'] = guid
 
-    return json.dumps(updated_field_values)
+    return json.dumps(updated_field_dict)
 
 def verifyEnvironmentGuidFields(updated_field_values, auth_header):
     # 'sanity-check' name/id info & required fields
@@ -200,8 +208,7 @@ def verifyEnvironmentGuidFields(updated_field_values, auth_header):
 
 def verifyChangesGuidFields(updated_field_values, auth_header):
     # 'sanity-check' name/id/addn'l info & required fields
-    if updated_field_values['additionalInformation'] == None or updated_field_values['additionalInformation'] == '[]':
-        updated_field_values['additionalInformation'] = []
+    updated_field_values['additionalInformation'] = cleanseNullListAsString(updated_field_values['additionalInformation'] )
 
     value = updated_field_values['name']
     if value == None or isGuid(value):
@@ -325,6 +332,14 @@ def updateChangesPlutoraDB(starting_fields, updated_json_dict, is_copy, auth_hea
 
     try:
         if is_copy:
+            updated_json_dict['stakeholders'] = cleanseNullListAsString(updated_json_dict['stakeholders'])
+            updated_json_dict['additionalInformation'] = cleanseNullListAsString(updated_json_dict['additionalInformation'])
+            # TODO: Must write something to handle this, eventually; for now, I'm just setting it to []
+            if 'OrderedDict' in updated_json_dict['additionalInformation']:
+                updated_json_dict['additionalInformation'] = []
+
+            updated_json_dict['systems'] = cleanseNullListAsString(updated_json_dict['systems'])
+            updated_json_dict['comments'] = cleanseNullListAsString(updated_json_dict['comments'])
             payload = json.dumps(updated_json_dict)
         else:
             payload = verifyChangesGuidFields(updated_json_dict, auth_header)
