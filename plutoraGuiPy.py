@@ -16,10 +16,11 @@ from collections import OrderedDict
 # further arguments are ignored.
 #
 plutoraBaseUrl = 'https://usapi.plutora.com'
-
+BinaryTrueFalse = {'True', 'False'}
 
 # Decide if the current argument is a guid or some other field
 def isGuid(value):
+    value = value.encode('ascii', 'ignore')
     if not value:
         return False
     else:
@@ -186,7 +187,7 @@ def verifyEnvironmentGuidFields(updated_field_values, auth_header):
         else: updated_field_values['usageWorkItemId'] = guid
 
     value = updated_field_values['isSharedEnvironment']
-    available_status_types = {'True', 'False'}
+    available_status_types = BinaryTrueFalse
     if not value in available_status_types:
         return  '{isSharedEnvironment is required and must be one of %s}' % (','.join(map(str,available_status_types)))
     else:
@@ -244,7 +245,7 @@ def updateSystemPlutoraDB(starting_fields, updated_json, is_copy, auth_header):
             pp.pprint(r.json())
             exit('Sorry, unrecoverable error; gotta go...')
         else:
-            return '{System: %s/%s}' % (r.json()['name'], r.json()['id'])
+            return '{System: %s(%s)}' % (r.json()['name'], r.json()['id'])
 
     except:
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
@@ -252,16 +253,25 @@ def updateSystemPlutoraDB(starting_fields, updated_json, is_copy, auth_header):
 
 # Given the original values (and any we supplied in the GUI, verify consistency
 # & go update the DB
-def updateReleasePlutoraDB(starting_fields, updated_json, is_copy, auth_header):
+def updateReleasePlutoraDB(starting_fields, updated_json_dict, is_copy, auth_header):
     pp = pprint.PrettyPrinter(indent=4)
 
     try:
         if is_copy:
-            payload = json.dumps(updated_json)
+            updated_json_dict['additionalInformation'] = []
+            mgrId = updated_json_dict['managerId']
+            if not isGuid(mgrId):
+                guid = getOrGetGuidFromValue('/users', 'userName', mgrId, auth_header)
+                if not guid in 'must be one':
+                    updated_json_dict['managerId'] = guid
+                else:
+                    return '{ManagerId is required}'
+
+            payload = json.dumps(updated_json_dict)
         else:
-            payload = verifyReleaseGuidFields(updated_json, auth_header)
-            if ''.join(map(str, updated_json)).find('required') != -1:
-                pp.pprint(updated_json)
+            payload = verifyReleaseGuidFields(updated_json_dict, auth_header)
+            if ''.join(map(str, updated_json_dict)).find('required') != -1:
+                pp.pprint(updated_json_dict)
                 exit('POST requires certain fields')
 
         r = requests.post(plutoraBaseUrl+'/releases', data=payload, headers=auth_header)
@@ -272,33 +282,37 @@ def updateReleasePlutoraDB(starting_fields, updated_json, is_copy, auth_header):
             pp.pprint(r.json())
             exit('Sorry, unrecoverable error; gotta go...')
         else:
-            return 'Release: %s/%s}' % (r.json()['name'],r.json()['id'])
+            return 'Release: %s(%s)}' % (r.json()['name'],r.json()['id'])
 
     except:
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
         exit('Error during API processing [POST]')
 
-def updateEnvironmentPlutoraDB(starting_fields, updated_json, is_copy, auth_header):
+def updateEnvironmentPlutoraDB(starting_fields, updated_json_dict, is_copy, auth_header):
     pp = pprint.PrettyPrinter(indent=4)
 
     try:
         if is_copy:
-            payload = json.dumps(updated_json)
+            if not updated_json_dict['isSharedEnvironment'] in BinaryTrueFalse:
+                updated_json_dict['isSharedEnvironment'] = 'False'
+            if not updated_json_dict['isSharedEnvironment'] == "[]":
+                updated_json_dict['hosts'] = []
+            payload = json.dumps(updated_json_dict)
         else:
-            payload = verifyEnvironmentGuidFields(updated_json, auth_header)
-            if ''.join(map(str, updated_json)).find('required') != -1:
-                pp.pprint(updated_json)
+            payload = verifyEnvironmentGuidFields(updated_json_dict, auth_header)
+            if ''.join(map(str, updated_json_dict)).find('required') != -1:
+                pp.pprint(updated_json_dict)
                 exit('POST requires certain fields')
 
         r = requests.post(plutoraBaseUrl+'/environments', data=payload, headers=auth_header)
         if r.status_code != 201:
             print('Post new release status code: %i' % r.status_code)
-            print('\nupdateReleasePlutoraDB.py: too bad! - [failed on Plutora create POST]')
+            print('\nupdateEnvironmentPlutoraDB.py: too bad! - [failed on Plutora create POST]')
             print("header: ", auth_header)
             pp.pprint(r.json())
             exit('Sorry, unrecoverable error; gotta go...')
         else:
-            return '{Environment: %s/%s}' % (r.json()['name'], r.json()['id'])
+            return '{Copied to Environment: %s(%s)}' % (r.json()['name'], r.json()['id'])
 
     except:
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
@@ -533,7 +547,7 @@ if __name__ == '__main__':
         config_filename = 'credentials.cfg'
 
     if results.gui and results.datepick:
-        print('Not Implemented, yet')
+        print('Datepicker Not Implemented, yet')
 
     # If we don't specify a configfile on the commandline, assume one & try accessing
     # using the specified/assumed configfilename, grab ClientId & Secret from manual setup of Plutora Oauth authorization.
