@@ -121,7 +121,7 @@ def getAuth(creds):
     authResponse = requests.post(authTokenUrl, data=payload, headers=headers)
     if authResponse.status_code != 200:
         print(authResponse.status_code)
-        print('updateDB: Sorry! - [failed on getAuthToken]: ', authResponse.text)
+        print('getAuth: Sorry! - [failed on getAuthToken]: ', authResponse.text)
         exit('Sorry, unrecoverable error; gotta go...')
     else:
         accessToken = authResponse.json()["access_token"]
@@ -262,10 +262,12 @@ def updateReleasePlutoraDB(starting_fields, updated_json_dict, is_copy, auth_hea
             mgrId = updated_json_dict['managerId']
             if not isGuid(mgrId):
                 guid = getOrGetGuidFromValue('/users', 'userName', mgrId, auth_header)
-                if not guid in 'must be one':
-                    updated_json_dict['managerId'] = guid
-                else:
+                # TODO: Originally used if not isGuid(guid), and it kept coming back as 'None', when
+                #       it wasn't really, so I directly code for the error-message
+                if 'must be one' in guid:
                     return '{ManagerId is required}'
+                else:
+                    updated_json_dict['managerId'] = guid
 
             payload = json.dumps(updated_json_dict)
         else:
