@@ -5,6 +5,8 @@ import json
 from Tkinter import *
 import sys
 import string
+import calendar
+import datetime
 from collections import OrderedDict
 
 
@@ -58,6 +60,103 @@ def getOrGetGuidFromValue(parmDesc, elem, value, header ):
         return 'must be one of %s' % (','.join(map(lambda k: k['value'], value)))
     else:
         return lookup_id[0]['id']
+
+class DatePicker:
+    def __init__(self, parent, values):
+        self.values = values
+        self.parent = parent
+        self.cal = calendar.TextDatePicker(calendar.SUNDAY)
+        self.year = datetime.date.today().year
+        self.month = datetime.date.today().month
+        self.wid = []
+        self.day_selected = 1
+        self.month_selected = self.month
+        self.year_selected = self.year
+        self.day_name = ''
+
+        self.setup(self.year, self.month)
+
+    def clear(self):
+        for w in self.wid[:]:
+            w.grid_forget()
+            #w.destroy()
+            self.wid.remove(w)
+
+    def go_prev(self):
+        if self.month > 1:
+            self.month -= 1
+        else:
+            self.month = 12
+            self.year -= 1
+        #self.selected = (self.month, self.year)
+        self.clear()
+        self.setup(self.year, self.month)
+
+    def go_next(self):
+        if self.month < 12:
+            self.month += 1
+        else:
+            self.month = 1
+            self.year += 1
+
+        #self.selected = (self.month, self.year)
+        self.clear()
+        self.setup(self.year, self.month)
+
+    def selection(self, day, name):
+        self.day_selected = day
+        self.month_selected = self.month
+        self.year_selected = self.year
+        self.day_name = name
+
+        #data
+        self.values['day_selected'] = day
+        self.values['month_selected'] = self.month
+        self.values['year_selected'] = self.year
+        self.values['day_name'] = name
+        self.values['month_name'] = calendar.month_name[self.month_selected]
+
+        self.clear()
+        self.setup(self.year, self.month)
+
+    def setup(self, y, m):
+        left = Button(self.parent, text='<', command=self.go_prev)
+        self.wid.append(left)
+        left.grid(row=0, column=1)
+
+        header = Label(self.parent, height=2, text='{}   {}'.format(calendar.month_abbr[m], str(y)))
+        self.wid.append(header)
+        header.grid(row=0, column=2, columnspan=3)
+
+        right = Button(self.parent, text='>', command=self.go_next)
+        self.wid.append(right)
+        right.grid(row=0, column=5)
+
+        days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+        for num, name in enumerate(days):
+            t = Label(self.parent, text=name[:3])
+            self.wid.append(t)
+            t.grid(row=1, column=num)
+
+        for w, week in enumerate(self.cal.monthdayscalendar(y, m), 2):
+            for d, day in enumerate(week):
+                if day:
+                    #print(calendar.day_name[day])
+                    b = Button(self.parent, width=1, text=day, command=lambda day=day:self.selection(day, calendar.day_name[(day-1) % 7]))
+                    self.wid.append(b)
+                    b.grid(row=w, column=d)
+
+        sel = Label(self.parent, height=2, text='{} {} {} {}'.format(
+            self.day_name, calendar.month_name[self.month_selected], self.day_selected, self.year_selected))
+        self.wid.append(sel)
+        sel.grid(row=8, column=0, columnspan=7)
+
+        ok = Button(self.parent, width=5, text='OK', command=self.kill)
+        self.wid.append(ok)
+        ok.grid(row=9, column=2, columnspan=3, pady=10)
+
+        def kill(self):
+            self.parent.destroy()
 
 # verify that all mandatory release-fields have the appropriate values
 # and return JSON-string with appropriately updated data, including
@@ -178,19 +277,21 @@ def verifyEnvironmentGuidFields(updated_fields_dict, auth_header):
     value = updated_fields_dict['linkedSystemId']
     if value == None or not isGuid(value):
         guid = getOrGetGuidFromValue('/systems', 'name', value, auth_header)
-        if not isGuid(guid): return '{LinkedSystemId is required}'
-        else: updated_fields_dict['linkedSystemId'] = guid
+        if isGuid(guid): updated_fields_dict['linkedSystemId'] = guid
+        else: return '{LinkedSystemId is required}'
 
     value = updated_fields_dict['environmentStatusId']
     if not isGuid(value):
-        guid = getOrGetGuidFromValue('/lookupfields/EnvironmentStatus', 'name', value, auth_header)
-        if not isGuid(guid): return '{EnvironmentStatus is required}'
-        else: updated_fields_dict['EnvironmentStatus'] = guid
-        return  '{EnvironmentStatus is required }'
+        guid = getOrGetGuidFromValue('/lookupfields/EnvironmentStatus', 'value', value, auth_header)
+        if isGuid(guid): updated_fields_dict['environmentStatusId'] = guid
+        else: return '{EnvironmentStatusId is required}'
 
     value = updated_fields_dict['usageWorkItemId']
     if not isGuid(value):
         guid = getOrGetGuidFromValue('/lookupfields/UsedForWorkItem', 'value', value, auth_header)
+        if isGuid(guid): updated_fields_dict['usageWorkItemId'] = guid
+        else: return '{UsedForWorkItem is required}'
+
         if not isGuid(guid): return '{UsedForWorkItem is required}'
         else: updated_fields_dict['usageWorkItemId'] = guid
 
@@ -382,6 +483,9 @@ class CreateMenu:
         quit_btn = Button(upper_frame, text="Done", command=parent.quit)
         quit_btn.pack(side=RIGHT)
 
+        new_date_btn = Button(upper_frame, text="New Impl. Date", command=self.popup)
+        new_date_btn.pack(side=RIGHT)
+
         lower_frame = Frame(parent)
         lower_frame.pack(side=BOTTOM)
 
@@ -405,11 +509,19 @@ class CreateMenu:
 
         return entries
 
+    def popup(self):
+        child = Toplevel()
+        cal = DatePicker(child, self.data)
+
+    def done(self):
+        self.parent.kill()
+
     def __init__(self, db_fields, auth_header):
+        self.data = {}
         self.auth_header = auth_header
-        self.root = root = Tk()
-        self.entries = self.makeform(root, db_fields)
-        root.mainloop()
+        self.parent = Tk()
+        self.entries = self.makeform(self.parent, db_fields)
+        self.parent.mainloop()
 
 def createRelease(use_gui, post_tgt_values_file, auth_header):
     try:
@@ -418,7 +530,7 @@ def createRelease(use_gui, post_tgt_values_file, auth_header):
         if use_gui:
             updated_fields = CreateMenu(org_fields, auth_header).fetch()
 
-        updateReleasePlutoraDB(org_fields, updated_fields, auth_header)
+        return updateReleasePlutoraDB(org_fields, updated_fields, False, auth_header)
 
     except Exception as e:
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0], sys.exc_info()[1].message)
@@ -441,7 +553,7 @@ def createSystem(use_gui, post_tgt_values_filename, auth_header):
         if use_gui:
             updated_fields = CreateMenu(org_fields, auth_header).fetch()
 
-        updateSystemPlutoraDB(org_fields, updated_fields, auth_header)
+        return updateSystemPlutoraDB(org_fields, updated_fields, False, auth_header)
 
     except Exception as e:
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0], sys.exc_info()[1].message)
@@ -463,7 +575,7 @@ def createEnvironment(use_gui, post_tgt_values_filename, auth_header):
         if use_gui:
             updated_fields = CreateMenu(org_fields, auth_header).fetch()
 
-        updateEnvironmentPlutoraDB(org_fields, updated_fields, False, auth_header)
+        return updateEnvironmentPlutoraDB(org_fields, updated_fields, False, auth_header)
 
     except Exception as e:
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
@@ -485,7 +597,7 @@ def createChanges(use_gui, post_tgt_values_filename, auth_header):
         if use_gui:
             updated_fields = CreateMenu(org_fields, authHeader).fetch()
 
-        updateChangesPlutoraDB(org_fields, updated_fields, auth_header)
+        return updateChangesPlutoraDB(org_fields, updated_fields, False, auth_header)
 
     except Exception as e:
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
@@ -566,13 +678,13 @@ if __name__ == '__main__':
         available_suffix_types = ['.rls', '.sys', '.env', '.chg']
         if post_tgt_values_file and len(filter(lambda k: k in post_tgt_values_file, available_suffix_types)) > 0:
             if '.sys' in post_tgt_values_file:
-                createSystem(results.gui, post_tgt_values_file, authHeader)
+                print(createSystem(results.gui, post_tgt_values_file, authHeader))
             elif '.rls' in post_tgt_values_file:
-                createRelease(results.gui, post_tgt_values_file, authHeader)
+                print(createRelease(results.gui, post_tgt_values_file, authHeader))
             elif '.env' in post_tgt_values_file:
-                createEnvironment(results.gui, post_tgt_values_file, authHeader)
+                print(createEnvironment(results.gui, post_tgt_values_file, authHeader))
             elif '.chg' in post_tgt_values_file:
-                createChanges(results.gui, post_tgt_values_file, authHeader)
+                print(createChanges(results.gui, post_tgt_values_file, authHeader))
             else:
                 print '{expected one of %s file suffixes}' % (','.join(map(str,available_suffix_types)))
         else:
