@@ -65,7 +65,7 @@ class DatePicker:
     def __init__(self, parent, values):
         self.values = values
         self.parent = parent
-        self.cal = calendar.TextDatePicker(calendar.SUNDAY)
+        self.cal = calendar.TextCalendar(calendar.SUNDAY)
         self.year = datetime.date.today().year
         self.month = datetime.date.today().month
         self.wid = []
@@ -151,12 +151,12 @@ class DatePicker:
         self.wid.append(sel)
         sel.grid(row=8, column=0, columnspan=7)
 
-        ok = Button(self.parent, width=5, text='OK', command=self.kill)
+        ok = Button(self.parent, width=5, text='OK', command=self.kill_and_save)
         self.wid.append(ok)
         ok.grid(row=9, column=2, columnspan=3, pady=10)
 
-        def kill(self):
-            self.parent.destroy()
+    def kill_and_save(self):
+        self.parent.destroy()
 
 # verify that all mandatory release-fields have the appropriate values
 # and return JSON-string with appropriately updated data, including
@@ -364,9 +364,16 @@ def updateSystemPlutoraDB(starting_fields, updated_json_dict, is_copy, auth_head
 def updateReleasePlutoraDB(starting_fields, updated_json_dict, is_copy, auth_header):
     pp = pprint.PrettyPrinter(indent=4)
 
+    pasteDate = lambda x, y: str(x['year_selected']) + '-' + str(x['month_selected']) + '-' + str(x['day_selected']) + y[y.find('T'):]
     try:
         if is_copy:
             updated_json_dict['additionalInformation'] = cleanseNullListAsString(updated_json_dict['additionalInformation'])
+
+            # combine with new Implementation-date
+            if updated_json_dict['date_info']:
+                dateInfo = updated_json_dict['date_info']
+                updated_json_dict['implementationDate'] = pasteDate(dateInfo, updated_json_dict['implementationDate'])
+
             if 'OrderedDict' in updated_json_dict['additionalInformation']:
                 updated_json_dict['additionalInformation'] = []
 
@@ -380,6 +387,11 @@ def updateReleasePlutoraDB(starting_fields, updated_json_dict, is_copy, auth_hea
 
             payload = json.dumps(updated_json_dict)
         else:
+            # combine with new Implementation-date
+            if updated_json_dict['date_info']:
+                dateInfo = updated_json_dict['date_info']
+                updated_json_dict['implementationDate'] = pasteDate(dateInfo, updated_json_dict['implementationDate'])
+
             payload = verifyReleaseGuidFields(updated_json_dict, auth_header)
             if ''.join(map(str, updated_json_dict)).find('required') != -1:
                 pp.pprint(updated_json_dict)
@@ -468,6 +480,9 @@ class CreateMenu:
         new_values = OrderedDict()
         for entry in self.entries:
             new_values[entry] = self.entries[entry].get()
+        new_date_info = self.fetch_date()
+        new_values['date_info'] = new_date_info
+
         return new_values
 
     def makeform(self, parent, db_fields):
@@ -512,6 +527,7 @@ class CreateMenu:
     def popup(self):
         child = Toplevel()
         cal = DatePicker(child, self.data)
+        self.data = cal.fetch_data()
 
     def done(self):
         self.parent.kill()
@@ -522,6 +538,13 @@ class CreateMenu:
         self.parent = Tk()
         self.entries = self.makeform(self.parent, db_fields)
         self.parent.mainloop()
+
+    def popup(self):
+        child = Toplevel()
+        cal = DatePicker(child, self.data)
+
+    def fetch_date(self):
+        return self.data
 
 def createRelease(use_gui, post_tgt_values_file, auth_header):
     try:
