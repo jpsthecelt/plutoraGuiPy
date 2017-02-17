@@ -20,6 +20,9 @@ from collections import OrderedDict
 plutoraBaseUrl = 'https://usapi.plutora.com'
 BinaryTrueFalse = {'True', 'False'}
 
+def jprint(parm):
+    print(json.loads(json.dumps(parm.encode('ascii', 'ignore'))))
+
 # Decide if the current argument is a guid or some other field
 def isGuid(value):
     value = value.encode('ascii', 'ignore')
@@ -322,12 +325,12 @@ def verifyChangesGuidFields(updated_field_values, auth_header):
     available_status_types = {'Active', 'Inactive'}
     value = updated_field_values['status']
     if not value in available_status_types:
-        return  '{SystemStatusTypeId is required and must be one of %s}' % (','.join(map(str,available_status_types)))
+        return  '{"error": { "reason": "SystemStatusTypeId is required and must be one of %s"}}' % (','.join(map(str,available_status_types)))
 
     value = updated_field_values['organizationId']
     if not isGuid(value):
         guid = getOrGetGuidFromValue('/organizations', 'name', value, auth_header)
-        if not isGuid(guid): return '{organizationId is required}'
+        if not isGuid(guid): return '{"error": { "reason": "organizationId is required"}}'
         else: updated_field_values['organizationId'] = guid
 
     return json.dumps(updated_field_values)
@@ -353,7 +356,7 @@ def updateSystemPlutoraDB(starting_fields, updated_json_dict, is_copy, auth_head
             pp.pprint(r.json())
             exit('Sorry, unrecoverable error; gotta go...')
         else:
-            return '{"createdsystem": {"name": %s, "id": %s}}' % (r.json()['name'], r.json()['id'])
+            return '{"createdsystem": {"name": "%s", "id": "%s"}}' % (r.json()['name'], r.json()['id'])
 
     except:
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
@@ -383,7 +386,7 @@ def updateReleasePlutoraDB(starting_fields, updated_json_dict, is_copy, auth_hea
                 if isGuid(guid):
                     updated_json_dict['managerId'] = guid
                 else:
-                    return '{ManagerId is required}'
+                    return '{"error": {"reason": "ManagerId is required"}}'
 
             payload = json.dumps(updated_json_dict)
         else:
@@ -405,7 +408,7 @@ def updateReleasePlutoraDB(starting_fields, updated_json_dict, is_copy, auth_hea
             pp.pprint(r.json())
             exit('Sorry, unrecoverable error; gotta go...')
         else:
-            return '{"createdrelease": { "name": %s, "id": %s}}' % (r.json()['name'], r.json()['id'])
+            return '{"createdrelease": { "name": "%s", "id": "%s"}}' % (r.json()['name'], r.json()['id'])
 
     except:
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
@@ -435,7 +438,7 @@ def updateEnvironmentPlutoraDB(starting_fields, updated_json_dict, is_copy, auth
             pp.pprint(r.json())
             exit('Sorry, unrecoverable error; gotta go...')
         else:
-            return '{"createdenvironment": {"name": %s, "id": %s}}' % (r.json()['name'], r.json()['id'])
+            return '{"createdenvironment": {"name": "%s", "id": "%s"}}' % (r.json()['name'], r.json()['id'])
 
     except:
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
@@ -469,7 +472,7 @@ def updateChangesPlutoraDB(starting_fields, updated_json_dict, is_copy, auth_hea
             pp.pprint(r.json())
             exit('Sorry, unrecoverable error; gotta go...')
         else:
-            return '{"createdchange": { "name": %s, "id": %s}}' % (r.json()['name'], r.json()['id'])
+            return '{"createdchange": { "name": "%s", "id": "%s"}}' % (r.json()['name'], r.json()['id'])
     except:
         print "EXCEPTION: type: %s, msg: %s " % (sys.exc_info()[0],sys.exc_info()[1].message)
         exit('Error during API processing [POST]')
@@ -637,12 +640,12 @@ def deleteEntity(item2del, auth_header):
     elif '/changes/' in item2del:
         res = requests.delete(plutoraBaseUrl+item2del, headers=auth_header)
     else:
-        return '{ Delete: Bad ResourceName }'
+        return '{ "error": { "reason": "Delete: Bad ResourceName" } }'
 
     if res.status_code != 200:
         return res.json()
     else:
-        return '{ deleted %s}' % item2del
+        return '{ "deleted": { "guid": "%s"}' % item2del
 
 
 if __name__ == '__main__':
@@ -656,7 +659,6 @@ if __name__ == '__main__':
                         help='filename containing JSON object prototype')
     parser.add_argument('-c', action='store', dest='guid_id_to_copy', help='release-id of release to copy')
     parser.add_argument("--gui", default=False, action='store_true')
-    parser.add_argument("--datepick", default=False, action='store_true')
     results = parser.parse_args()
 
     if len(sys.argv[1:]) < 1:
@@ -671,9 +673,6 @@ if __name__ == '__main__':
     config_filename = results.config_filename
     if results.config_filename == None:
         config_filename = 'credentials.cfg'
-
-    if results.gui and results.datepick:
-        print('Datepicker Not Implemented, yet')
 
     # If we don't specify a configfile on the commandline, assume one & try accessing
     # using the specified/assumed configfilename, grab ClientId & Secret from manual setup of Plutora Oauth authorization.
@@ -701,15 +700,15 @@ if __name__ == '__main__':
         available_suffix_types = ['.rls', '.sys', '.env', '.chg']
         if post_tgt_values_file and len(filter(lambda k: k in post_tgt_values_file, available_suffix_types)) > 0:
             if '.sys' in post_tgt_values_file:
-                print(createSystem(results.gui, post_tgt_values_file, authHeader))
+                jprint(createSystem(results.gui, post_tgt_values_file, authHeader))
             elif '.rls' in post_tgt_values_file:
-                print(createRelease(results.gui, post_tgt_values_file, authHeader))
+                jprint(createRelease(results.gui, post_tgt_values_file, authHeader))
             elif '.env' in post_tgt_values_file:
-                print(createEnvironment(results.gui, post_tgt_values_file, authHeader))
+                jprint(createEnvironment(results.gui, post_tgt_values_file, authHeader))
             elif '.chg' in post_tgt_values_file:
-                print(createChanges(results.gui, post_tgt_values_file, authHeader))
+                jprint(createChanges(results.gui, post_tgt_values_file, authHeader))
             else:
-                print '{expected one of %s file suffixes}' % (','.join(map(str,available_suffix_types)))
+                print '{ "error": {"reason": "expected one of %s file suffixes"}' % (','.join(map(str,available_suffix_types)))
         else:
 # Although it would be possible to get a POST prototype from https://usapi.plutora.com/Help/Api/POST-releases
 # body/div/2nd section/P/H2/H3/Pa/H3/P/A/TABLE/H3/Div/H2/H3/P/A/TABLE/H3/Div/Div/span/pre/#text
@@ -729,15 +728,15 @@ if __name__ == '__main__':
                     updated_field_values = CreateMenu(original_fields, authHeader).fetch()
 
                 if '/environments/' in item2copy:
-                    print(updateEnvironmentPlutoraDB(original_fields, updated_field_values, isCopy, authHeader))
+                    jprint(updateEnvironmentPlutoraDB(original_fields, updated_field_values, isCopy, authHeader))
                 elif '/releases/' in item2copy:
-                    print(updateReleasePlutoraDB(original_fields, updated_field_values, isCopy, authHeader))
+                    jprint(updateReleasePlutoraDB(original_fields, updated_field_values, isCopy, authHeader))
                 elif '/systems/' in item2copy:
-                    print(updateSystemPlutoraDB(original_fields, updated_field_values, isCopy, authHeader))
+                    jprint(updateSystemPlutoraDB(original_fields, updated_field_values, isCopy, authHeader))
                 elif '/changes/' in item2copy:
-                    print(updateChangesPlutoraDB(original_fields, updated_field_values, isCopy, authHeader))
+                    jprint(updateChangesPlutoraDB(original_fields, updated_field_values, isCopy, authHeader))
                 else:
-                    print '{ copy: Bad GuidName }'
+                    print '{ "error": { "reason": "copy: Bad GuidName"} }'
 
     except Exception as e:
          # ex.msg is a string that looks like a dictionary
