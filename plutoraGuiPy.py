@@ -175,37 +175,37 @@ def verifyReleaseGuidFields(updated_fields_dict, hdr ):
 
     value = updated_fields_dict['releaseTypeId']
     if value == None:
-        return '{ReleaseTypeId is required}'
+        return '{"error": { "reason": "ReleaseTypeId is required"}}'
     if not isGuid(value):
         guid = getOrGetGuidFromValue('/lookupfields/ReleaseType', 'value', value, hdr )
         if not isGuid(guid): return '{ReleaseTypeId is required}'
         else: updated_fields_dict['releaseTypeId'] = guid
 
     if updated_fields_dict['location'] == None:
-        return '{Location is required}'
+        return '{"error": { "reason": "Location is required"}}'
 
     value = updated_fields_dict['releaseStatusTypeId']
     if not isGuid(value):
         guid = getOrGetGuidFromValue('/lookupfields/ReleaseStatusType', 'value', value, hdr)
-        if not isGuid(guid): return  '{ReleaseStatusTypeId is required}'
+        if not isGuid(guid): return  '{"error": { "reason": ReleaseStatusTypeId is required"}}'
         else: updated_fields_dict['releaseStatusTypeId'] = guid
 
     value = updated_fields_dict['releaseRiskLevelId']
     if not isGuid(value):
         guid = getOrGetGuidFromValue('/lookupfields/ReleaseRiskLevel', 'value', value, hdr)
-        if not isGuid(guid): return  '{ReleaseRiskLevelId is required}'
+        if not isGuid(guid): return  '{"error": { "reason": "ReleaseRiskLevelId is required"}}'
         else: updated_fields_dict['releaseRiskLevelId'] = guid
 
     value = updated_fields_dict['organizationId']
     if not isGuid(value):
         guid = getOrGetGuidFromValue('/organizations', 'name', value, hdr)
-        if not isGuid(guid): return '{organizationId is required}'
+        if not isGuid(guid): return '{"error": {"reason": "organizationId is required"}}'
         else: updated_fields_dict['organizationId'] = guid
 
     value = updated_fields_dict['managerId']
     if not isGuid(value):
         guid = getOrGetGuidFromValue('/users', 'userName', value, hdr)
-        if not isGuid(guid): return  '{managerID is required}'
+        if not isGuid(guid): return  '{"error": { "reason": "managerID is required"}}'
         else: updated_fields_dict['managerId'] = guid
 
     return json.dumps(updated_fields_dict)
