@@ -1,0 +1,2 @@
+EXCEPTION: type: <type 'exceptions.TypeError'>, msg: string indices must be integers 
+EXCEPTION: type: <type 'exceptions.KeyboardInterrupt'>, msg:  

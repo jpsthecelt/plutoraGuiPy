@@ -1,0 +1,59 @@
+{"createdenvironment": {"name": "SAP HR PERF", "id": "35482442-2f7a-4e85-90ed-68d7d888bfb3"}}
+{"createdenvironment": {"name": "SAP HR ST", "id": "11791559-7b93-4323-9ddb-2596b7104b3d"}}
+{"createdenvironment": {"name": "SAP HR SIT", "id": "f08d6d79-ec30-4e37-89ec-6189f2596560"}}
+{"createdenvironment": {"name": "SAP HR STAGE", "id": "5d34dd4a-bb9c-457e-8e8a-678e5a82da9b"}}
+{"createdenvironment": {"name": "SAP HR UAT", "id": "28d6b657-ae70-4a6b-bf9b-f9e671df690e"}}
+{"createdenvironment": {"name": "Sharepoint PERF", "id": "bed0032e-4b96-4781-bc99-9d03152919ff"}}
+{"createdenvironment": {"name": "Sharepoint ST", "id": "a4913890-a9c8-4040-8fce-d9ffd7d80735"}}
+{"createdenvironment": {"name": "Sharepoint SIT", "id": "78386134-2a85-4eae-9826-5f1a1b4b2817"}}
+{"createdenvironment": {"name": "Sharepoint STAGE", "id": "f1071439-9bb2-45c4-8b69-b37770eee9b2"}}
+{"createdenvironment": {"name": "Sharepoint UAT", "id": "77902cbf-ee9a-4daa-9029-2ab683e724fa"}}
+{"createdenvironment": {"name": "SMS PERF", "id": "1d595c97-b19d-4bea-881e-572802e62125"}}
+{"createdenvironment": {"name": "SMS ST", "id": "955c1483-1c64-4dcd-b7c3-8561c81bd6af"}}
+EXCEPTION: type: <type 'exceptions.TypeError'>, msg: string indices must be integers 
+EXCEPTION: type: <type 'exceptions.TypeError'>, msg: string indices must be integers 
+EXCEPTION: type: <type 'exceptions.TypeError'>, msg: string indices must be integers 
+{"createdenvironment": {"name": "SMS SIT", "id": "9742bb23-8066-433f-bdb6-3bb779e99582"}}
+{"createdenvironment": {"name": "SMS STAGE", "id": "979a8ba1-ed7d-483c-b7c4-2a7c54aded48"}}
+EXCEPTION: type: <type 'exceptions.TypeError'>, msg: string indices must be integers 
+{"createdenvironment": {"name": "SMS UAT", "id": "4e501ff3-96d9-4ec4-aafe-e88f75f66424"}}
+{"createdenvironment": {"name": "State Street PERF", "id": "4e92ddcf-d05c-4a34-94e8-332071254108"}}
+{"createdenvironment": {"name": "State Street ST", "id": "29d46bf0-ff4c-4a62-9540-6ca770315344"}}
+{"createdenvironment": {"name": "State Street SIT", "id": "760fd638-66e5-46d2-ab04-7a886432b92d"}}
+{"createdenvironment": {"name": "State Street STAGE", "id": "ca9ca524-1a3f-4630-9ace-d1b13a9c0789"}}
+{"createdenvironment": {"name": "State Street UAT", "id": "4775029f-6769-41b8-a5df-cde950042b3f"}}
+{"createdenvironment": {"name": "Workday PERF", "id": "173d2744-773a-4563-9c89-2c51b29c1540"}}
+{"createdenvironment": {"name": "Workday ST", "id": "6e4ebc06-6865-4d62-826f-9202822f8849"}}
+{"createdenvironment": {"name": "Workday SIT", "id": "c6e93517-b90a-4387-997d-625bc5f14410"}}
+{"createdenvironment": {"name": "Workday STAGE", "id": "f3ad55a7-bf61-4fa2-b76f-c13527ef89c7"}}
+{"createdenvironment": {"name": "Workday UAT", "id": "99253fc6-8afa-4194-821e-cc4011d7a132"}}
+{"createdenvironment": {"name": "Sopra PERF", "id": "4251a329-e910-40f0-a562-ad878f1f8c82"}}
+{"createdenvironment": {"name": "Sopra ST", "id": "73a92b7a-45ab-4d48-b632-7309c4140274"}}
+{"createdenvironment": {"name": "Sopra SIT", "id": "d38a8795-95cd-4f6a-9546-02a29cbbd119"}}
+{"createdenvironment": {"name": "Sopra STAGE", "id": "e2d03df9-7d05-49b9-b721-cd9f30baed17"}}
+{"createdenvironment": {"name": "Sopra UAT", "id": "34b8a5ed-04d5-4860-b61d-253a563776a4"}}
+{"createdenvironment": {"name": "MyBank PERF", "id": "c85c7dc2-6c1f-4b01-8292-9bdf52183140"}}
+{"createdenvironment": {"name": "MyBank ST", "id": "440e5257-e0b3-4d67-9f97-8006693f1219"}}
+{"createdenvironment": {"name": "MyBank SIT", "id": "92194a61-cbd3-4c47-b6dc-517887400938"}}
+{"createdenvironment": {"name": "MyBank STAGE", "id": "20dc8ef3-cf71-4a24-a5fa-29cd266765d7"}}
+{"createdenvironment": {"name": "MyBank UAT", "id": "0b12751e-cdd7-4c59-adfe-a563f5c363dc"}}
+{"createdenvironment": {"name": "SWIFT PERF", "id": "c5cf3476-1221-49b6-a241-4cc4b572843e"}}
+{"createdenvironment": {"name": "SWIFT ST", "id": "b39482e8-6b83-43f5-b9fd-7769725d6c38"}}
+{"createdenvironment": {"name": "SWIFT SIT", "id": "482651f8-e9fa-48c1-9937-a83a7b710aa0"}}
+{"createdenvironment": {"name": "SWIFT STAGE", "id": "7a7bcd57-be3b-45a5-92b7-d35d0ed1c4de"}}
+{"createdenvironment": {"name": "SWIFT UAT", "id": "c4316672-edf6-440c-a095-cb5174e6dd5c"}}
+{"createdenvironment": {"name": "Sanctions DB PERF", "id": "ab4a6fb2-fddd-4cdd-a07f-87bbd72d47a7"}}
+{"createdenvironment": {"name": "Sanctions DB ST", "id": "9676bf55-892a-45f2-bc31-bef0ab401d83"}}
+{"createdenvironment": {"name": "Sanctions DB SIT", "id": "18db1a86-cdce-42fc-bd28-befa56650a73"}}
+{"createdenvironment": {"name": "Sanctions DB STAGE", "id": "46ded70c-0c70-4c35-a1fb-3f953e2fba5d"}}
+{"createdenvironment": {"name": "Sanctions DB UAT", "id": "5eb04772-1fbb-41ab-ad96-5193309685ff"}}
+{"createdenvironment": {"name": "Treasury Mainframe PERF", "id": "e0c6f23a-33cd-4739-9b2c-7c11f96b65d7"}}
+{"createdenvironment": {"name": "Treasury Mainframe ST", "id": "b6d185eb-9976-4b36-88d4-97f71c35da68"}}
+{"createdenvironment": {"name": "Treasury Mainframe SIT", "id": "930954a5-ac3d-45d2-a741-c9a28e2c262f"}}
+{"createdenvironment": {"name": "Treasury Mainframe STAGE", "id": "35d2d2d9-c1e8-4690-9e52-3aab16cf74cb"}}
+{"createdenvironment": {"name": "Treasury Mainframe UAT", "id": "deeee6c7-a680-4694-8853-7cd88bd06d41"}}
+{"createdenvironment": {"name": "Epicare DB PERF", "id": "0798e31a-fb67-4fc5-bc62-bcf5519b7739"}}
+{"createdenvironment": {"name": "Epicare DB ST", "id": "1779fdb6-0889-4265-a85b-aa2234600c43"}}
+{"createdenvironment": {"name": "Epicare DB SIT", "id": "199cb16e-f315-42ce-b590-e8925965bb7e"}}
+{"createdenvironment": {"name": "Epicare DB STAGE", "id": "fa7f69c8-ff8c-4184-99db-4b50f8f242ab"}}
+{"createdenvironment": {"name": "Epicare DB UAT", "id": "f64206bf-06e6-4073-8de9-95c249b82d9c"}}

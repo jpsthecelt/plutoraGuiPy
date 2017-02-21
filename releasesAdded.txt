@@ -1,0 +1,5 @@
+EXCEPTION: type: <type 'exceptions.TypeError'>, msg: string indices must be integers, not str 
+EXCEPTION: type: <type 'exceptions.TypeError'>, msg: string indices must be integers, not str 
+EXCEPTION: type: <type 'exceptions.TypeError'>, msg: string indices must be integers, not str 
+{"createdrelease": { "name": "Emergency Hotfix", "id": "844296ed-b8de-4198-bf80-a77f2ad8651e"}}
+EXCEPTION: type: <type 'exceptions.TypeError'>, msg: string indices must be integers, not str 
