@@ -20,10 +20,12 @@ from collections import OrderedDict
 plutoraBaseUrl = 'https://usapi.plutora.com'
 BinaryTrueFalse = {'True', 'False'}
 
+# For some reason, JSON output displays the 'u' property on strings, this avoids that by forcing it to
+# ascii-output.
 def jprint(parm):
     print(json.loads(json.dumps(parm.encode('ascii', 'ignore'))))
 
-# Decide if the current argument is a guid or some other field
+# Decide if the current argument is a guid or some other field (only compare ASCII chars).
 def isGuid(value):
     value = value.encode('ascii', 'ignore')
     if not value:
@@ -59,7 +61,7 @@ def getOrGetGuidFromValue(parmDesc, elem, value, header ):
     lookup_id = [id_val for id_val in lookup_ids if id_val[elem] == value]
 
     if len(lookup_id) == 0:
-        # (note use of names function, above) [decided to make this a lambda-function, instead]
+        # [note that lambda function, here is used instead of defining a separate function]
         return 'must be one of %s' % (','.join(map(lambda k: k['value'], value)))
     else:
         return lookup_id[0]['id']
@@ -230,8 +232,8 @@ def getAuth(creds):
     authResponse = requests.post(authTokenUrl, data=payload, headers=headers)
     if authResponse.status_code != 200:
         print(authResponse.status_code)
-        print('getAuth: Sorry! - [failed on getAuthToken]: ', authResponse.text)
-        exit('Sorry, unrecoverable error; gotta go...')
+        jprint('{"error": {"reason": "getAuth: unrecoverable error - [failed on getAuthToken: %s"}}' % authResponse.text)
+        exit()
     else:
         accessToken = authResponse.json()["access_token"]
 
@@ -247,21 +249,21 @@ def verifySystemGuidFields(updated_field_dict, auth_header):
 
     value = updated_field_dict['name']
     if value == None or isGuid(value):
-        return '{Name is required}'
+        return '{"error": {"reason": "Name is required"}}'
 
     value = updated_field_dict['vendor']
     if value == None or isGuid(value):
-        return '{Vendor is required}'
+        return '{"error": {"reason": "Vendor is required"}}'
 
     available_status_types = {'Active', 'Inactive'}
     value = updated_field_dict['status']
     if not value in available_status_types:
-        return  '{SystemStatusTypeId is required and must be one of %s}' % (','.join(map(str,available_status_types)))
+        return  '{"error": {"reason": "SystemStatusTypeId is required and must be one of %s" }}' % (','.join(map(str,available_status_types)))
 
     value = updated_field_dict['organizationId']
     if not isGuid(value):
         guid = getOrGetGuidFromValue('/organizations', 'name', value, auth_header)
-        if not isGuid(guid): return '{organizationId is required}'
+        if not isGuid(guid): return '{"error": {"reason": "organizationId is required"}}'
         else: updated_field_dict['organizationId'] = guid
 
     return json.dumps(updated_field_dict)
@@ -271,29 +273,29 @@ def verifyEnvironmentGuidFields(updated_fields_dict, auth_header):
 
     value = updated_fields_dict['name']
     if value == None or isGuid(value):
-        return '{Name is required}'
+        return '{"error": {"reason": "Name is required"}}'
 
     value = updated_fields_dict['vendor']
     if value == None or isGuid(value):
-        return '{Vendor is required}'
+        return '{"error": {"reason": "Vendor is required"}}'
 
     value = updated_fields_dict['linkedSystemId']
     if value == None or not isGuid(value):
         guid = getOrGetGuidFromValue('/systems', 'name', value, auth_header)
         if isGuid(guid): updated_fields_dict['linkedSystemId'] = guid
-        else: return '{LinkedSystemId is required}'
+        else: return '{"error": {"reason": "LinkedSystemId is required"}}'
 
     value = updated_fields_dict['environmentStatusId']
     if not isGuid(value):
         guid = getOrGetGuidFromValue('/lookupfields/EnvironmentStatus', 'value', value, auth_header)
         if isGuid(guid): updated_fields_dict['environmentStatusId'] = guid
-        else: return '{EnvironmentStatusId is required}'
+        else: return '{"error": {"reason": "EnvironmentStatusId is required"}}'
 
     value = updated_fields_dict['usageWorkItemId']
     if not isGuid(value):
         guid = getOrGetGuidFromValue('/lookupfields/UsedForWorkItem', 'value', value, auth_header)
         if isGuid(guid): updated_fields_dict['usageWorkItemId'] = guid
-        else: return '{UsedForWorkItem is required}'
+        else: return '{"error": {"reason": "UsedForWorkItem is required"}}'
 
         if not isGuid(guid): return '{UsedForWorkItem is required}'
         else: updated_fields_dict['usageWorkItemId'] = guid
@@ -301,13 +303,13 @@ def verifyEnvironmentGuidFields(updated_fields_dict, auth_header):
     value = updated_fields_dict['isSharedEnvironment']
     available_status_types = BinaryTrueFalse
     if not value in available_status_types:
-        return  '{isSharedEnvironment is required and must be one of %s}' % (','.join(map(str, available_status_types)))
+        return  '{"error": { "reason": "isSharedEnvironment is required and must be one of %s"}}' % (','.join(map(str, available_status_types)))
     else:
         value = eval(updated_fields_dict['isSharedEnvironment'])
 
     value = updated_fields_dict['color']
     if not isColor(value):
-        return  '{Color is required and must be in the format #HHHHHH}'
+        return  '{"error": { "reason": "Color is required and must be in the format #HHHHHH"}}'
     return json.dumps(updated_fields_dict)
 
 def verifyChangesGuidFields(updated_field_values, auth_header):
@@ -316,11 +318,11 @@ def verifyChangesGuidFields(updated_field_values, auth_header):
 
     value = updated_field_values['name']
     if value == None or isGuid(value):
-        return '{Name is required}'
+        return '{"error": {"reason": "Name is required"}}'
 
     value = updated_field_values['vendor']
     if value == None or isGuid(value):
-        return '{Vendor is required}'
+        return '{"error": {"reason": "Vendor is required"}}'
 
     available_status_types = {'Active', 'Inactive'}
     value = updated_field_values['status']
@@ -345,16 +347,12 @@ def updateSystemPlutoraDB(starting_fields, updated_json_dict, is_copy, auth_head
         else:
             payload = verifySystemGuidFields(updated_json_dict, auth_header)
             if ''.join(map(str, payload)).find('required') != -1:
-                pp.pprint(payload)
-                exit('POST requires certain fields')
+                return '{"error": { "reason": "%s - Post requires certain fields"}}' % payload
 
         r = requests.post(plutoraBaseUrl+'/systems', data=payload, headers=auth_header)
         if r.status_code != 201:
-            print('Post new release status code: %i' % r.status_code)
-            print('\nupdateSystemPlutoraDB.py: too bad! - [failed on Plutora create POST]')
-            print("header: ", auth_header)
-            pp.pprint(r.json())
-            exit('Sorry, unrecoverable error; gotta go...')
+            return  '{"error": {"reason": "[updateSystemPlutoraDB: Failed on Plutora Create POST] %s","status": "%s" }}' % (r.json(), r.status_code)
+            exit()
         else:
             return '{"createdsystem": {"name": "%s", "id": "%s"}}' % (r.json()['name'], r.json()['id'])
 
@@ -391,7 +389,7 @@ def updateReleasePlutoraDB(starting_fields, updated_json_dict, is_copy, auth_hea
             payload = json.dumps(updated_json_dict)
         else:
             # combine with new Implementation-date
-            if updated_json_dict['date_info']:
+            if 'date_info' in updated_json_dict and updated_json_dict['date_info']:
                 dateInfo = updated_json_dict['date_info']
                 updated_json_dict['implementationDate'] = pasteDate(dateInfo, updated_json_dict['implementationDate'])
 
