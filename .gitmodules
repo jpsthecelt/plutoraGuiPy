@@ -1,0 +1,18 @@
+[submodule "pushChanges"]
+	path = pushChanges
+	url = https://github.com/jpsthecelt/pushChanges.git
+[submodule "pltJiraCrossInteg"]
+	path = pltJiraCrossInteg
+	url = https://github.com/jpsthecelt/pltJiraCrossInteg.git
+[submodule "plutoraDump"]
+	path = plutoraDump
+	url = https://github.com/jpsthecelt/plutoraDump.git
+[submodule "plutoraPush"]
+	path = plutoraPush
+	url = https://github.com/jpsthecelt/plutoraPush.git
+[submodule "plutoraCreateSys"]
+	path = plutoraCreateSys
+	url = https://github.com/jpsthecelt/plutoraCreateSys.git
+[submodule "plutoraCreate"]
+	path = plutoraCreate
+	url = https://github.com/jpsthecelt/plutoraCreate.git
